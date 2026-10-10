@@ -13,6 +13,7 @@
   "dependencies": {
     "@hiredesk/database": "*",
     "@hiredesk/shared": "*",
+    "@supabase/supabase-js": "^2.49.1",
     "dotenv": "^16.4.7",
     "imapflow": "^1.0.171",
     "mailparser": "^3.7.2",

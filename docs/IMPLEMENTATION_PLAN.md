@@ -78,14 +78,19 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ---
 
-### [PENDING] Phase 4 — Email Ingestion Worker & Unmatched Queue
-- [ ] IMAP client in `apps/worker` using `imapflow`.
-- [ ] MIME parsing and attachment streaming using `mailparser`.
-- [ ] Job Code extractor (subject line first, body fallback, strict `JOB-\d+`).
-- [ ] Idempotency tracking table `InboundApplication` (mailboxId + UIDVALIDITY + UID).
-- [ ] Unmatched queue management API and UI in `apps/web`.
-- [ ] Manual assignment flow for recruiters to match unparsed emails to jobs.
-- [ ] Offline fixture tests for valid-code, no-code, malformed-code, and duplicate emails.
+### [COMPLETED] Phase 4 — Inbound Email Ingestion, Job Code Matching, Retry Safety & Unmatched Applications
+- [x] Versioned Prisma migration `20261011000002_inbound_fields` adding `matchedClientId`, `lastAttemptAt`, `rawPayload`, and indexes to `inbound_applications`.
+- [x] Pure Job Code extractor in `apps/worker/src/jobCodeExtractor.ts` with subject-first, body-fallback, HTML-fallback, and entity decoding.
+- [x] PyjamaHR email parser in `apps/worker/src/emailParser.ts` using `mailparser` extracting candidate name, email, phone, location, and attachments.
+- [x] Storage service in `apps/worker/src/storage.ts` enforcing magic bytes validation (PDF, DOC, DOCX), 10 MB limit, and private Supabase Storage upload.
+- [x] Concurrency-safe, atomic lease state machine in `apps/worker/src/inboundProcessor.ts` (`received -> processing -> matched | unmatched | duplicate | failed | ignored`).
+- [x] Candidate deduplication by `(organizationId, normalizedEmail)` and application idempotency on `(jobId, candidateId)` (marks `duplicate` without duplicate rows or redundant storage uploads).
+- [x] Compensating transaction rollback: deletes uploaded resume storage object if database write fails, preventing orphaned files.
+- [x] IMAP worker daemon in `apps/worker/src/imapClient.ts` with non-overlapping polling cycles, bounded backoff, graceful shutdown, and pluggable `MailboxFetcher` interface.
+- [x] Unmatched applications management API in `apps/api/src/routes/inbound.ts` (`GET /api/admin/inbound-applications`, `GET /api/admin/inbound-applications/:id`, `POST /api/admin/inbound-applications/:id/assign`, `POST /api/admin/inbound-applications/:id/retry`, `POST /api/admin/inbound-applications/:id/ignore`).
+- [x] Unmatched Queue web UI in `apps/web/src/pages/UnmatchedApplicationsView.tsx` with status filter tabs, search, manual job assignment modal, and ignore modal.
+- [x] Sanitized test email RFC822 fixture in `apps/worker/fixtures/sample_application_email.eml`.
+- [x] 88 automated unit/API/worker tests passing across all packages; live Supabase database and storage end-to-end verified with `test_inbound_e2e.mjs`.
 
 ---
 

@@ -56,3 +56,18 @@
 - **Context**: Prisma connects to PostgreSQL using connection pooling credentials that bypass standard Postgres RLS policies unless specifically configured with tenant transactions.
 - **Decision**: Implement centralized authorization helpers in `apps/api/src/services`. Every Prisma query MUST explicitly include `organizationId: req.user.organizationId` (and `clientId: req.user.clientId` for client role). PostgreSQL RLS is enabled as a secondary defense layer for direct Supabase connections.
 - **Consequences**: Transparent, testable authorization logic in code, backed by extensive negative isolation unit and API tests.
+
+---
+
+## ADR-008: Inbound Email Ingestion Idempotency, Lease State Machine & Compensating Rollback
+- **Status**: Accepted
+- **Context**: Inbound application emails arrive over external IMAP protocols where connections may drop, servers restart, or workers scale concurrently. Resumes must be securely stored in private storage while candidate and application records must be atomically written in PostgreSQL without orphaned files or duplicate submissions.
+- **Decision**:
+  1. **Mailbox Idempotency**: Unique constraint on `(mailboxId, uidValidity, uid)` in `InboundApplication`.
+  2. **Lease State Machine**: Workers claim leases atomically via `status = 'processing'` and `lastAttemptAt = now()`. Leases older than 5 minutes can be safely reclaimed for crash recovery.
+  3. **Strict Job Matching**: Pure exact token match on `JOB-\d+` (subject-first, plain-text body fallback, HTML fallback with entity decoding). Never fuzzy-match by title. Ambiguous or unknown codes transition to `unmatched` (`ambiguous_job_code`, `no_job_code`, `job_code_not_found`).
+  4. **Tenancy Derivation**: `organizationId` and `clientId` are strictly resolved from the database `Job` record, never from untrusted email contents.
+  5. **Duplicate Application Policy**: If an application already exists for `(jobId, candidateId)`, the inbound record is marked `status = 'duplicate'`, linking `linkedApplicationId` without re-uploading the resume or creating redundant candidate/application records.
+  6. **Compensating Rollback**: If the relational database transaction fails, the uploaded storage file is immediately deleted via compensating cleanup and the record transitions to `failed` (`database_failed`).
+  7. **Unmatched Queue Isolation**: Unmatched records with unassigned tenants are platform-isolated and can only be assigned by Super Admins. Recruiter/Manager access is strictly scoped to their assigned organization.
+- **Consequences**: Zero dropped emails, zero orphaned resume files, strict multi-tenant isolation, and resilient crash recovery.

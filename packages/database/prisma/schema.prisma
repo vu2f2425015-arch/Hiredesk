@@ -193,18 +193,23 @@ model InboundApplication {
   extractedJobCode    String?
   matchedJobId        String?
   matchedOrgId        String?
+  matchedClientId     String?
   status              String    @default("received")
   failureReason       String?
   attemptCount        Int       @default(0)
+  lastAttemptAt       DateTime?
   processedAt         DateTime?
   linkedCandidateId   String?
   linkedApplicationId String?
+  rawPayload          Json      @default("{}")
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   @@unique([mailboxId, uidValidity, uid])
   @@index([status])
   @@index([extractedJobCode])
+  @@index([matchedOrgId])
+  @@index([messageId])
   @@map("inbound_applications")
 }
 

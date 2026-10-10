@@ -19,6 +19,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './pages/AuthView';
 import { JobsView } from './pages/JobsView';
 import { PublicCareerView } from './pages/PublicCareerView';
+import { UnmatchedApplicationsView } from './pages/UnmatchedApplicationsView';
 
 interface HealthResponse {
   status: string;
@@ -159,7 +160,7 @@ function AppShell() {
           <Route path="/jobs" element={<JobsView />} />
           <Route path="/career/:orgSlug" element={<PublicCareerView />} />
           <Route path="/career/:orgSlug/:jobCode" element={<PublicCareerView />} />
-          <Route path="/unmatched" element={<UnmatchedPlaceholderView />} />
+          <Route path="/unmatched" element={<UnmatchedApplicationsView />} />
           <Route path="/system-status" element={<SystemStatusView health={health} loading={loading} error={error} />} />
         </Routes>
       </main>
@@ -285,22 +286,6 @@ function OverviewView({
             </span>
           </li>
         </ul>
-      </div>
-    </div>
-  );
-}
-
-
-function UnmatchedPlaceholderView() {
-  return (
-    <div className="empty-state">
-      <Inbox className="empty-icon" size={48} />
-      <h2 className="empty-title">Unmatched Applications Queue</h2>
-      <p className="empty-desc">
-        Inbound application emails lacking valid Job Codes or requiring manual recruiter review will appear here in Phase 4.
-      </p>
-      <div style={{ display: 'inline-flex', gap: '0.75rem' }}>
-        <span className="status-pill status-offline">Phase 4: Pending</span>
       </div>
     </div>
   );

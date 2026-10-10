@@ -1,0 +1,31 @@
+From: PyjamaHR Notifications <notifications@pyjamahr.com>
+To: agency-inbound@hiredesk.io
+Subject: Application received for Senior Backend Engineer (JOB-1003)
+Date: Sun, 11 Oct 2026 10:00:00 +0000
+Message-ID: <pyjamahr-sample-fixture-001@pyjamahr.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="SAMPLE_FIXTURE_BOUNDARY"
+
+--SAMPLE_FIXTURE_BOUNDARY
+Content-Type: text/plain; charset=utf-8
+
+Dear Recruiting Team,
+
+A candidate has submitted an application for JOB-1003 via PyjamaHR:
+
+Name: Alex Rivera
+Email: alex.rivera@example.com
+Phone: +1 555-0182
+Location: Chicago, IL
+
+Please find the candidate resume attached.
+
+Regards,
+PyjamaHR Application Relay
+--SAMPLE_FIXTURE_BOUNDARY
+Content-Type: application/pdf; name="alex_rivera_resume.pdf"
+Content-Disposition: attachment; filename="alex_rivera_resume.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKMSAwIG9iago8PD4+CmVuZG9iagp0cmFpbGVyCjw8Pj4KJSVFT0Y=
+--SAMPLE_FIXTURE_BOUNDARY--

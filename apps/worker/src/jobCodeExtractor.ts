@@ -1,6 +1,6 @@
 export interface JobCodeExtractionResult {
   jobCode: string | null;
-  source: 'subject' | 'body' | null;
+  source: 'subject' | 'body' | 'html' | null;
   candidatesFound: string[];
   isAmbiguous: boolean;
 }
@@ -16,6 +16,24 @@ export function normalizeJobCodeString(rawToken: string): string | null {
     return null;
   }
   return `JOB-${match[1]}`;
+}
+
+/**
+ * Strips HTML tags and resolves common entities safely.
+ */
+export function stripHtmlTags(html: string): string {
+  if (!html) return '';
+  return html
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -39,11 +57,12 @@ export function findJobCodesInText(text: string): string[] {
 }
 
 /**
- * Extracts and normalizes Job Code from email subject first, falling back to body.
+ * Extracts and normalizes Job Code from email subject first, then plain-text body,
+ * then safely converted HTML body.
  */
-export function extractJobCode(subject: string, body?: string): JobCodeExtractionResult {
+export function extractJobCode(subject: string, textBody?: string, htmlBody?: string): JobCodeExtractionResult {
   // 1. Search subject line first
-  const subjectCodes = findJobCodesInText(subject);
+  const subjectCodes = findJobCodesInText(subject || '');
 
   if (subjectCodes.length === 1) {
     return {
@@ -63,9 +82,9 @@ export function extractJobCode(subject: string, body?: string): JobCodeExtractio
     };
   }
 
-  // 2. Fall back to body if subject had zero matches
-  if (body) {
-    const bodyCodes = findJobCodesInText(body);
+  // 2. Fall back to plain text body if subject had zero matches
+  if (textBody) {
+    const bodyCodes = findJobCodesInText(textBody);
 
     if (bodyCodes.length === 1) {
       return {
@@ -86,7 +105,31 @@ export function extractJobCode(subject: string, body?: string): JobCodeExtractio
     }
   }
 
-  // 3. No match found
+  // 3. Fall back to stripped HTML representation if plain text had zero matches
+  if (htmlBody) {
+    const strippedHtml = stripHtmlTags(htmlBody);
+    const htmlCodes = findJobCodesInText(strippedHtml);
+
+    if (htmlCodes.length === 1) {
+      return {
+        jobCode: htmlCodes[0],
+        source: 'html',
+        candidatesFound: htmlCodes,
+        isAmbiguous: false,
+      };
+    }
+
+    if (htmlCodes.length > 1) {
+      return {
+        jobCode: null,
+        source: 'html',
+        candidatesFound: htmlCodes,
+        isAmbiguous: true,
+      };
+    }
+  }
+
+  // 4. No match found
   return {
     jobCode: null,
     source: null,

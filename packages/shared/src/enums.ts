@@ -46,4 +46,5 @@ export enum InboundStatus {
   RETRYING = 'retrying',
   MANUALLY_ASSIGNED = 'manually_assigned',
   IGNORED = 'ignored',
+  DUPLICATE = 'duplicate',
 }
