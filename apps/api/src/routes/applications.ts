@@ -4,6 +4,9 @@ import rateLimit from 'express-rate-limit';
 import {
   PublicApplySchema,
   ApplicationQuerySchema,
+  CandidateQuerySchema,
+  StageTransitionSchema,
+  UpdateNotesSchema,
   UserRole,
 } from '@hiredesk/shared';
 import { authenticate, requireRole } from '../middleware/auth.js';
@@ -189,3 +192,150 @@ applicationsRouter.get(
     }
   }
 );
+
+/**
+ * GET /api/jobs/:jobId/pipeline
+ * Retrieves applications for a job grouped by pipeline stage.
+ */
+applicationsRouter.get(
+  '/jobs/:jobId/pipeline',
+  authenticate,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER, UserRole.CLIENT),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { jobId } = req.params;
+      const pipeline = await ApplicationService.listPipelineForJob(req.user!, jobId);
+      sendSuccess(res, pipeline);
+    } catch (err: any) {
+      if (err.statusCode) {
+        sendError(res, err.code || 'BAD_REQUEST', err.message, err.statusCode);
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /api/applications/:id/stage
+ * PATCH /api/applications/:id/stage
+ * Atomically transitions an application's stage, recording stage history and activity.
+ */
+const handleStageTransition = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const parse = StageTransitionSchema.safeParse(req.body);
+    if (!parse.success) {
+      sendError(res, 'VALIDATION_ERROR', 'Invalid stage transition', 400, parse.error.flatten().fieldErrors);
+      return;
+    }
+
+    const application = await ApplicationService.transitionStage(req.user!, id, parse.data);
+    sendSuccess(res, application);
+  } catch (err: any) {
+    if (err.statusCode) {
+      sendError(res, err.code || 'BAD_REQUEST', err.message, err.statusCode);
+      return;
+    }
+    next(err);
+  }
+};
+
+applicationsRouter.post(
+  '/applications/:id/stage',
+  authenticate,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER, UserRole.CLIENT),
+  handleStageTransition
+);
+
+applicationsRouter.patch(
+  '/applications/:id/stage',
+  authenticate,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER, UserRole.CLIENT),
+  handleStageTransition
+);
+
+/**
+ * PATCH /api/applications/:id/notes
+ * Updates internal recruiter notes and/or client feedback with strict role checks.
+ */
+applicationsRouter.patch(
+  '/applications/:id/notes',
+  authenticate,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER, UserRole.CLIENT),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const parse = UpdateNotesSchema.safeParse(req.body);
+      if (!parse.success) {
+        sendError(res, 'VALIDATION_ERROR', 'Invalid notes payload', 400, parse.error.flatten().fieldErrors);
+        return;
+      }
+
+      const application = await ApplicationService.updateApplicationNotes(req.user!, id, parse.data);
+      sendSuccess(res, application);
+    } catch (err: any) {
+      if (err.statusCode) {
+        sendError(res, err.code || 'BAD_REQUEST', err.message, err.statusCode);
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/candidates
+ * Lists / searches candidates within caller's scope.
+ */
+applicationsRouter.get(
+  '/candidates',
+  authenticate,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER, UserRole.CLIENT),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parse = CandidateQuerySchema.safeParse(req.query);
+      if (!parse.success) {
+        sendError(res, 'VALIDATION_ERROR', 'Invalid query parameters', 400, parse.error.flatten().fieldErrors);
+        return;
+      }
+
+      const result = await ApplicationService.listCandidates(req.user!, parse.data);
+      sendSuccess(res, result.candidates, 200, {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+      });
+    } catch (err: any) {
+      if (err.statusCode) {
+        sendError(res, err.code || 'BAD_REQUEST', err.message, err.statusCode);
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/candidates/:id
+ * Fetches candidate profile and authorized multi-job applications.
+ */
+applicationsRouter.get(
+  '/candidates/:id',
+  authenticate,
+  requireRole(UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER, UserRole.CLIENT),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const candidate = await ApplicationService.getCandidateById(req.user!, id);
+      sendSuccess(res, candidate);
+    } catch (err: any) {
+      if (err.statusCode) {
+        sendError(res, err.code || 'BAD_REQUEST', err.message, err.statusCode);
+        return;
+      }
+      next(err);
+    }
+  }
+);
+

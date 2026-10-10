@@ -237,8 +237,10 @@ model ActivityLog {
   entityId       String
   action         String
   details        Json         @default("{}")
+  visibility     String       @default("internal") // internal, client_visible
   timestamp      DateTime     @default(now())
 
   @@index([organizationId, timestamp])
+  @@index([organizationId, visibility])
   @@map("activity_logs")
 }

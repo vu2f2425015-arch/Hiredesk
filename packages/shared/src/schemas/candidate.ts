@@ -68,9 +68,22 @@ export const ApplicationQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
 
+export const CandidateQuerySchema = z.object({
+  search: z.string().max(100).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
 export const StageTransitionSchema = z.object({
-  stage: z.nativeEnum(ApplicationStage),
+  stage: z.nativeEnum(ApplicationStage, {
+    errorMap: () => ({ message: 'Invalid application stage' }),
+  }),
   reason: z.string().max(500).optional(),
+});
+
+export const UpdateNotesSchema = z.object({
+  recruiterNotes: z.string().max(5000).optional(),
+  clientFeedback: z.string().max(5000).optional(),
 });
 
 export type CandidateCreateInput = z.infer<typeof CandidateCreateSchema>;
@@ -78,5 +91,6 @@ export type PublicApplyInput = z.infer<typeof PublicApplySchema>;
 export type PublicApplyResponse = z.infer<typeof PublicApplyResponseSchema>;
 export type ApplicationDto = z.infer<typeof ApplicationDtoSchema>;
 export type ApplicationQueryInput = z.infer<typeof ApplicationQuerySchema>;
+export type CandidateQueryInput = z.infer<typeof CandidateQuerySchema>;
 export type StageTransitionInput = z.infer<typeof StageTransitionSchema>;
-
+export type UpdateNotesInput = z.infer<typeof UpdateNotesSchema>;

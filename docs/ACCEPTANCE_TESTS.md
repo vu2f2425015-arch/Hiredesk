@@ -49,6 +49,30 @@ graph TD
 | **SEC-07** | `POST /api/public/apply/:id` | Public applicant | Flood 50 requests in 1 minute | `429 Too Many Requests` (Rate limit) |
 | **SEC-08** | `POST /api/public/apply/:id` | Public applicant | Upload `.exe` disguised as `.pdf` | `400 Bad Request` (Invalid file type/magic byte) |
 | **SEC-09** | Any endpoint | Inactive user | Valid JWT but `UserProfile.active == false` | `403 Forbidden` |
+| **SEC-10** | `GET /api/analytics/dashboard` | Recruiter (Org A) | Attempt to view aggregate metrics of Org B | Scoped to Org A; Org B counts never leak |
+| **SEC-11** | `GET /api/analytics/dashboard` | Client User (Client 1) | Attempt to view agency-wide metrics | Scoped to Client 1 assigned jobs only |
+| **SEC-12** | `PATCH /api/applications/:id/notes` | Client User (Client 1) | Attempt to mutate `recruiterNotes` | `403 Forbidden` (`FORBIDDEN`) |
+| **SEC-13** | `GET /api/applications/:id` | Client User (Client 1) | View application details | `recruiterNotes` is completely redacted (`undefined`) |
+| **SEC-14** | `POST /api/applications/:id/stage` | Client User (Client 1) | Transition application in `Applied` stage | `403 Forbidden` (Only permitted in `Client Review`) |
+| **SEC-15** | `POST /api/applications/:id/stage` | Recruiter (Org A) | Submit malformed stage enum (e.g. `INVALID`) | `400 Bad Request` (`VALIDATION_ERROR`) |
+
+---
+
+## 3. Phase 5 Acceptance Test Matrix: Recruiter Dashboard, Pipeline & Notes
+
+| Test ID | Module | Scenario / Input | Expected Result | Verified Against |
+| :--- | :--- | :--- | :--- | :--- |
+| **P5-01** | Analytics | `GET /api/analytics/dashboard` for populated agency | Returns real DB-computed counts for total, published, draft, closed jobs, unique candidates, 7-day recent apps, stage breakdown, and 14-day deadline alerts | Vitest + Live Supabase |
+| **P5-02** | Analytics | `GET /api/analytics/dashboard` for empty organization | Returns honest zeros (0 jobs, 0 candidates, 0 apps, empty arrays) without demo/sample data | Vitest |
+| **P5-03** | Analytics | Multi-tenant isolation | Org A and Org B query dashboard; counts strictly isolated | Vitest |
+| **P5-04** | Pipeline | `GET /api/jobs/:id/pipeline` | Groups applications into 10 canonical stages (`Applied`, `Screening`, `Shortlisted`, `Interview`, `AI Interview`, `Client Review`, `Selected`, `Hired`, `Rejected`, `Withdrawn`) | Vitest + Live Supabase |
+| **P5-05** | Stage Transition | `POST /api/applications/:id/stage` with valid stage & reason | Atomically updates `Application.stage`, inserts `StageHistory`, and inserts `ActivityLog` in single transaction | Vitest + Live Supabase |
+| **P5-06** | Stage Rollback | Simulated database transaction crash during stage update | Neither `Application.stage` nor `StageHistory` are modified (clean rollback, 500 error) | Vitest |
+| **P5-07** | Notes Security | Recruiter sets internal notes via `PATCH /api/applications/:id/notes` | Note persisted, internal `ActivityLog` recorded | Vitest + Live Supabase |
+| **P5-08** | Notes Security | Client reads application with recruiter notes present | `recruiterNotes` is stripped/undefined; `clientFeedback` remains readable | Vitest + Live Supabase |
+| **P5-09** | Notes Security | Client updates feedback via `PATCH /api/applications/:id/notes` | `clientFeedback` persisted; `client_visible` activity log created; recruiter notes untouched | Vitest + Live Supabase |
+| **P5-10** | Candidate Profile | `GET /api/candidates/:id` | Returns personal details, resumes, and multi-job applications with independent stage histories | Vitest + Live Supabase |
+| **P5-11** | Candidate Search | `GET /api/candidates?search=...&page=1&limit=10` | Performs paginated search across name, email, phone, location | Vitest |
 
 ---
 

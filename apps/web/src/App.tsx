@@ -5,12 +5,7 @@ import {
   Layers,
   Inbox,
   Activity,
-  ShieldCheck,
-  CheckCircle2,
   AlertCircle,
-  Server,
-  Database,
-  Cpu,
   LogIn,
   LogOut,
   User as UserIcon,
@@ -18,6 +13,7 @@ import {
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './pages/AuthView';
 import { JobsView } from './pages/JobsView';
+import { DashboardView } from './pages/DashboardView';
 import { PublicCareerView } from './pages/PublicCareerView';
 import { UnmatchedApplicationsView } from './pages/UnmatchedApplicationsView';
 
@@ -80,7 +76,7 @@ function AppShell() {
 
         <nav className="nav-links">
           <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
-            <Layers size={16} /> Overview
+            <Layers size={16} /> Dashboard
           </NavLink>
           <NavLink to="/jobs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             <Briefcase size={16} /> Jobs
@@ -155,7 +151,7 @@ function AppShell() {
 
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<OverviewView health={health} loading={loading} error={error} />} />
+          <Route path="/" element={<DashboardView />} />
           <Route path="/login" element={<AuthView />} />
           <Route path="/jobs" element={<JobsView />} />
           <Route path="/career/:orgSlug" element={<PublicCareerView />} />
@@ -170,123 +166,6 @@ function AppShell() {
           HiredeskHR &bull; Multi-Tenant Recruitment Architecture &bull; Supabase Auth & Multi-Tenant Security &bull; Zero Mock Data Guarantee
         </p>
       </footer>
-    </div>
-  );
-}
-
-function OverviewView({
-  health,
-  loading,
-  error,
-}: {
-  health: HealthResponse | null;
-  loading: boolean;
-  error: string | null;
-}) {
-  const { profile } = useAuth();
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      <div className="glass-card" style={{ borderLeft: '4px solid var(--primary)' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Recruitment Agency ATS Foundation</h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '1.05rem', maxWidth: '800px' }}>
-          HiredeskHR enables recruitment agencies to manage multiple client pipelines, maintain strict tenant boundaries,
-          and bridge job aggregator applications through concurrency-safe Job Codes.
-        </p>
-        {profile && (
-          <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)' }}>
-            <CheckCircle2 size={16} /> Authenticated as <strong>{profile.fullName || profile.email}</strong> ({profile.role.toUpperCase()}) &bull; Tenant: {profile.organizationName || 'Platform Super-Admin'}
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
-        <div className="glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <Server style={{ color: 'var(--accent-cyan)' }} size={24} />
-            <h3>Express Auth & RBAC Gateway</h3>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Protected APIs verifying Supabase JWTs, attaching trusted <code>req.user</code> context, and strictly enforcing tenant and client boundaries.
-          </p>
-          <div style={{ fontSize: '0.85rem', color: health?.status === 'ok' ? 'var(--success)' : 'var(--text-dim)' }}>
-            Status: {loading ? 'Querying...' : health?.status === 'ok' ? 'Connected & Healthy' : error || 'Offline'}
-          </div>
-        </div>
-
-        <div className="glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <Database style={{ color: 'var(--accent-violet)' }} size={24} />
-            <h3>Multi-Tenant Data Isolation</h3>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Hierarchical isolation enforcing Agency Organizations &rarr; Clients &rarr; Jobs &rarr; Candidates &rarr; Applications.
-          </p>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
-            Source: <code>packages/database/prisma/schema.prisma</code>
-          </div>
-        </div>
-
-        <div className="glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-            <Cpu style={{ color: 'var(--primary)' }} size={24} />
-            <h3>IMAP Ingestion Worker</h3>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-            Dedicated Node daemon with <code>jobCodeExtractor</code> tested for dash variants, case insensitivity, and email body fallbacks.
-          </p>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
-            Extractor verified with 9 comprehensive unit tests.
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-card">
-        <h3 style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <ShieldCheck style={{ color: 'var(--success)' }} size={20} /> Project Architectural Documentation
-        </h3>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '1.25rem', fontSize: '0.95rem' }}>
-          All technical specifications, security models, and acceptance tests are verified in the local workspace:
-        </p>
-        <ul style={{ listStyle: 'none', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
-          <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-            <CheckCircle2 size={16} color="var(--success)" />
-            <span>
-              <code>docs/PRODUCT_SPEC.md</code> &bull; User roles & workflows
-            </span>
-          </li>
-          <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-            <CheckCircle2 size={16} color="var(--success)" />
-            <span>
-              <code>docs/ARCHITECTURE.md</code> &bull; Component topologies
-            </span>
-          </li>
-          <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-            <CheckCircle2 size={16} color="var(--success)" />
-            <span>
-              <code>docs/DATA_MODEL.md</code> &bull; Full ERD & sequence specs
-            </span>
-          </li>
-          <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-            <CheckCircle2 size={16} color="var(--success)" />
-            <span>
-              <code>docs/SECURITY_MODEL.md</code> &bull; Multi-tenant RLS & RBAC
-            </span>
-          </li>
-          <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-            <CheckCircle2 size={16} color="var(--success)" />
-            <span>
-              <code>docs/ACCEPTANCE_TESTS.md</code> &bull; Critical 11-step gate
-            </span>
-          </li>
-          <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-            <CheckCircle2 size={16} color="var(--success)" />
-            <span>
-              <code>docs/DECISIONS.md</code> &bull; 7 Architectural Decision Records
-            </span>
-          </li>
-        </ul>
-      </div>
     </div>
   );
 }

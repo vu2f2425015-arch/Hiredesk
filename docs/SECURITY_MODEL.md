@@ -126,3 +126,28 @@ For tables accessed via direct Supabase client connections or public extensions:
 - `.env` files are in `.gitignore`.
 - `.env.example` provides complete documentation of required variables with empty/dummy values.
 - Centralized `config.ts` validates required environment variables at server startup using Zod.
+
+---
+
+## 7. Notes Separation & Stage Transition Access Control
+
+### 7.1 Hard Separation of Recruiter Notes
+1. **Recruiter Internal Notes (`recruiterNotes`)**:
+   - Strictly reserved for internal agency recruiters and managers.
+   - For any API request authenticated as `role === 'client'`, `recruiterNotes` is unconditionally redacted and stripped from the returned object (`undefined`).
+   - If a client user attempts to submit or modify `recruiterNotes` via `PATCH /api/applications/:id/notes`, the API immediately aborts with `403 Forbidden` (`FORBIDDEN`).
+2. **Client Feedback (`clientFeedback`)**:
+   - Bi-directionally visible to both client users and internal agency recruiters.
+   - Client users can submit reviews, ratings, and feedback on candidates assigned to their client organization.
+   - Creates an `ActivityLog` record marked `visibility: 'client_visible'`.
+
+### 7.2 Stage Transition Authorization Matrix
+1. **Recruiters & Managers**:
+   - Can transition applications across any valid canonical stage (`Applied`, `Screening`, `Shortlisted`, `Interview`, `AI Interview`, `Client Review`, `Selected`, `Hired`, `Rejected`, `Withdrawn`) within their organization.
+2. **Clients**:
+   - Cannot make unrestricted recruiter-level stage movements.
+   - Can only transition applications that are currently in the `Client Review` stage (e.g. approving to shortlist or returning feedback). Transitions on any other stage return `403 Forbidden`.
+3. **Atomic Persistence Guarantee**:
+   - Stage transitions write `Application.stage`, `StageHistory`, and `ActivityLog` in a single PostgreSQL `$transaction`.
+   - If any step fails, the entire transaction rolls back, preventing orphaned history or stale state.
+

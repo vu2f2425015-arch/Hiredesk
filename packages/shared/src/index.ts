@@ -3,3 +3,4 @@ export * from './schemas/job.js';
 export * from './schemas/candidate.js';
 export * from './schemas/auth.js';
 export * from './schemas/inbound.js';
+export * from './schemas/analytics.js';

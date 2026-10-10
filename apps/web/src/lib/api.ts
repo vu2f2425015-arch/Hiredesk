@@ -266,3 +266,237 @@ export async function fetchResumeDownloadUrl(
   return json.data;
 }
 
+// ============================================================================
+// Phase 5: Dashboard Analytics, Pipeline & Candidate Profile
+// ============================================================================
+
+export interface DashboardMetrics {
+  totalJobs: number;
+  publishedJobs: number;
+  draftJobs: number;
+  closedJobs: number;
+  totalCandidates: number;
+  totalApplications: number;
+  recentApplicationsCount: number;
+  stageCounts: Record<string, number>;
+  jobsApproachingDeadline: Array<{
+    id: string;
+    jobCode: string;
+    title: string;
+    clientName: string;
+    deadline: string;
+    daysRemaining: number;
+  }>;
+  recentActivity: Array<{
+    id: string;
+    timestamp: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    details: any;
+    actor?: {
+      id: string;
+      fullName: string;
+      role: string;
+    } | null;
+  }>;
+}
+
+export interface PipelineApplication {
+  id: string;
+  candidateId: string;
+  jobId: string;
+  stage: string;
+  source: string;
+  appliedAt: string;
+  clientFeedback?: string | null;
+  recruiterNotes?: string | null;
+  candidate: {
+    id: string;
+    candidateCode: string;
+    name: string;
+    normalizedEmail: string;
+    phone?: string | null;
+    location?: string | null;
+    skills?: string[];
+  };
+  resumes: Array<{
+    id: string;
+    originalFilename: string;
+    fileSize: number;
+    contentType: string;
+    uploadedAt: string;
+  }>;
+  lastStageChange?: {
+    timestamp: string;
+    reason?: string | null;
+  } | null;
+}
+
+export interface JobPipeline {
+  job: {
+    id: string;
+    jobCode: string;
+    title: string;
+    status: string;
+    client?: { id: string; name: string } | null;
+  };
+  stages: Record<string, PipelineApplication[]>;
+  counts: Record<string, number>;
+  totalApplications: number;
+}
+
+export interface CandidateProfile {
+  id: string;
+  candidateCode: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  location?: string | null;
+  country?: string | null;
+  skills: string[];
+  education: any;
+  experience: any;
+  createdAt: string;
+  updatedAt: string;
+  applications: Array<{
+    id: string;
+    jobId: string;
+    stage: string;
+    source: string;
+    appliedAt: string;
+    clientFeedback?: string | null;
+    recruiterNotes?: string | null;
+    job: {
+      id: string;
+      jobCode: string;
+      title: string;
+      status: string;
+      clientId: string;
+      client?: { name: string } | null;
+    };
+    resumes: Array<{
+      id: string;
+      originalFilename: string;
+      fileSize: number;
+    }>;
+    lastStageChange?: {
+      id: string;
+      previousStage: string;
+      nextStage: string;
+      timestamp: string;
+      reason?: string | null;
+    } | null;
+  }>;
+  resumes: Array<{
+    id: string;
+    originalFilename: string;
+    fileSize: number;
+    contentType: string;
+    uploadedAt: string;
+  }>;
+}
+
+export async function fetchDashboardAnalytics(
+  token: string,
+  organizationId?: string
+): Promise<DashboardMetrics> {
+  const url = organizationId ? `/api/analytics/dashboard?organizationId=${organizationId}` : '/api/analytics/dashboard';
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch dashboard metrics');
+  }
+  return json.data;
+}
+
+export async function fetchJobPipeline(token: string, jobId: string): Promise<JobPipeline> {
+  const res = await fetch(`/api/jobs/${jobId}/pipeline`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch job pipeline');
+  }
+  return json.data;
+}
+
+export async function transitionApplicationStage(
+  token: string,
+  applicationId: string,
+  stage: string,
+  reason?: string
+): Promise<any> {
+  const res = await fetch(`/api/applications/${applicationId}/stage`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ stage, reason }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to transition application stage');
+  }
+  return json.data;
+}
+
+export async function updateApplicationNotes(
+  token: string,
+  applicationId: string,
+  input: { recruiterNotes?: string; clientFeedback?: string }
+): Promise<any> {
+  const res = await fetch(`/api/applications/${applicationId}/notes`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to update application notes');
+  }
+  return json.data;
+}
+
+export async function fetchCandidateProfile(token: string, candidateId: string): Promise<CandidateProfile> {
+  const res = await fetch(`/api/candidates/${candidateId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch candidate profile');
+  }
+  return json.data;
+}
+
+export async function fetchCandidates(
+  token: string,
+  query?: { search?: string; page?: number; limit?: number }
+): Promise<{ candidates: any[]; total: number; page: number; limit: number }> {
+  const params = new URLSearchParams();
+  if (query?.search) params.set('search', query.search);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+
+  const res = await fetch(`/api/candidates?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch candidates');
+  }
+  return {
+    candidates: json.data,
+    total: json.meta?.total || json.data.length,
+    page: json.meta?.page || 1,
+    limit: json.meta?.limit || 20,
+  };
+}
+
+

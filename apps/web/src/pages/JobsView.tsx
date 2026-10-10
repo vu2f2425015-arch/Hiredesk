@@ -30,6 +30,8 @@ import {
   ApplicationItem,
 } from '../lib/api';
 import { EmploymentType, JobStatus, WorkplaceModel, UserRole } from '@hiredesk/shared';
+import { JobPipelineView } from './JobPipelineView';
+import { CandidateProfileModal } from './CandidateProfileModal';
 
 export function JobsView() {
   const { session, profile } = useAuth();
@@ -42,6 +44,8 @@ export function JobsView() {
   const [search, setSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<ApiJob | null>(null);
+  const [pipelineJob, setPipelineJob] = useState<ApiJob | null>(null);
+  const [activeProfileCandidateId, setActiveProfileCandidateId] = useState<string | null>(null);
 
   // Modal state
   const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
@@ -193,7 +197,11 @@ export function JobsView() {
       </div>
 
       {/* Content Area */}
-      {loading ? (
+      {pipelineJob ? (
+        <div className="glass-card" style={{ padding: '1.5rem' }}>
+          <JobPipelineView jobId={pipelineJob.id} onClose={() => setPipelineJob(null)} />
+        </div>
+      ) : loading ? (
         <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
           <RefreshCw className="pulse-dot" style={{ margin: '0 auto 1rem auto' }} />
           <p style={{ color: 'var(--text-muted)' }}>Loading persisted jobs from server...</p>
@@ -300,6 +308,13 @@ export function JobsView() {
                 </span>
 
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    className="btn btn-secondary"
+                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: 'var(--primary)', borderColor: 'rgba(99, 102, 241, 0.4)' }}
+                    onClick={() => setPipelineJob(job)}
+                  >
+                    <Layers size={13} style={{ marginRight: '0.25rem' }} /> Pipeline
+                  </button>
                   <button className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={() => setSelectedJob(job)}>
                     Details
                   </button>
@@ -351,6 +366,16 @@ export function JobsView() {
           onDuplicate={canCreate ? () => handleDuplicate(selectedJob.id) : undefined}
           onPublish={canCreate && selectedJob.status === 'draft' ? () => handlePublish(selectedJob.id) : undefined}
           onCloseJob={canCreate && selectedJob.status === 'published' ? () => handleClose(selectedJob.id) : undefined}
+          onOpenCandidateProfile={(candidateId) => setActiveProfileCandidateId(candidateId)}
+        />
+      )}
+
+      {/* Candidate Profile Modal */}
+      {activeProfileCandidateId && (
+        <CandidateProfileModal
+          candidateId={activeProfileCandidateId}
+          onClose={() => setActiveProfileCandidateId(null)}
+          onApplicationUpdated={loadJobs}
         />
       )}
     </div>
@@ -661,16 +686,18 @@ function JobDetailModal({
   onDuplicate,
   onPublish,
   onCloseJob,
+  onOpenCandidateProfile,
 }: {
   job: ApiJob;
   onClose: () => void;
   onDuplicate?: () => void;
   onPublish?: () => void;
   onCloseJob?: () => void;
+  onOpenCandidateProfile?: (candidateId: string) => void;
 }) {
   const { session } = useAuth();
   const token = session?.access_token;
-  const [activeTab, setActiveTab] = useState<'details' | 'applicants'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'pipeline' | 'applicants'>('details');
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loadingApps, setLoadingApps] = useState<boolean>(false);
   const [appsLoaded, setAppsLoaded] = useState<boolean>(false);
@@ -704,7 +731,7 @@ function JobDetailModal({
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-      <div className="glass-card" style={{ maxWidth: '720px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="glass-card" style={{ maxWidth: activeTab === 'pipeline' ? '1200px' : '720px', width: '100%', maxHeight: '90vh', overflowY: 'auto', transition: 'max-width 0.2s ease' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
@@ -740,6 +767,25 @@ function JobDetailModal({
             Job Details
           </button>
           <button
+            onClick={() => setActiveTab('pipeline')}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'pipeline' ? '2px solid var(--primary)' : '2px solid transparent',
+              color: activeTab === 'pipeline' ? 'var(--primary)' : 'var(--text-dim)',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <Layers size={14} />
+            <span>Pipeline</span>
+          </button>
+          <button
             onClick={() => setActiveTab('applicants')}
             style={{
               padding: '0.5rem 1rem',
@@ -762,7 +808,11 @@ function JobDetailModal({
           </button>
         </div>
 
-        {activeTab === 'details' ? (
+        {activeTab === 'pipeline' ? (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <JobPipelineView jobId={job.id} />
+          </div>
+        ) : activeTab === 'details' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)' }}>
@@ -851,7 +901,10 @@ function JobDetailModal({
                       gap: '0.75rem',
                     }}
                   >
-                    <div>
+                    <div
+                      style={{ cursor: 'pointer', flex: 1 }}
+                      onClick={() => onOpenCandidateProfile?.(app.candidate.id)}
+                    >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.8rem', color: 'var(--primary)', background: 'rgba(99,102,241,0.15)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
                           {app.candidate.candidateCode}
@@ -870,7 +923,15 @@ function JobDetailModal({
                       </div>
                     </div>
 
-                    <div>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                        onClick={() => onOpenCandidateProfile?.(app.candidate.id)}
+                      >
+                        <User size={13} /> Profile
+                      </button>
+
                       {app.resumes && app.resumes.length > 0 ? (
                         <button
                           className="btn btn-secondary"
@@ -883,7 +944,7 @@ function JobDetailModal({
                           ) : (
                             <Download size={14} />
                           )}
-                          <span>Resume ({(app.resumes[0].fileSize / 1024).toFixed(0)} KB)</span>
+                          <span>Resume</span>
                         </button>
                       ) : (
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>No resume</span>

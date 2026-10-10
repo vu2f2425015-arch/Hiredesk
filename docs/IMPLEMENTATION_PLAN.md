@@ -94,13 +94,37 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ---
 
-### [PENDING] Phase 5 — Recruiter Dashboard, Candidate Profile & Pipeline
-- [ ] Live database-derived metrics API (active jobs, candidate counts by stage).
-- [ ] Visual candidate pipeline board (Kanban / stage-grouped list) in `apps/web`.
-- [ ] Candidate detail page with resume preview and application history.
-- [ ] Stage transition API with role checks, `StageHistory`, and `ActivityLog`.
-- [ ] Separation of recruiter-internal notes from client-visible notes.
-- [ ] Tests verifying stage persistence across server restarts.
+### [COMPLETED] Phase 5 — Recruiter Dashboard, Candidate Profile, Pipeline Progression & Activity History
+- [x] Versioned Prisma migration `20261011000003_activity_visibility` adding `visibility` column and `(organizationId, visibility)` composite index to `activity_logs`. Applied to live Supabase DB.
+- [x] Shared Zod contracts in `packages/shared/src/schemas/analytics.ts` and `candidate.ts` (`DashboardMetricsDto`, `DashboardAnalyticsQuerySchema`, `CandidateQuerySchema`, `StageTransitionSchema`, `UpdateNotesSchema`).
+- [x] Live database-derived metrics API in `apps/api/src/services/analytics.ts` and `apps/api/src/routes/analytics.ts` (`GET /api/analytics/dashboard`):
+  - Total jobs, active/published, drafts, closed.
+  - Total unique candidates in permitted tenant scope.
+  - New applications within UTC 7-day window.
+  - Canonical stage counts (`Applied`, `Screening`, `Shortlisted`, `Interview`, `AI Interview`, `Client Review`, `Selected`, `Hired`, `Rejected`, `Withdrawn`).
+  - Jobs approaching application deadline within 14 days.
+  - Recent activity timeline with tenant/role-based visibility filtering.
+  - Honest zeros for empty organizations (zero fake sample data).
+- [x] Atomic stage transition service in `apps/api/src/services/applications.ts` (`POST /api/applications/:id/stage`):
+  - Executes `Application.stage`, `StageHistory`, and `ActivityLog` write inside a single PostgreSQL `$transaction`.
+  - Actor ID verified against `UserProfile` table with foreign key safety.
+  - Client users strictly restricted from making recruiter-only stage changes (only allowed when application is currently in `Client Review`).
+- [x] Hard separation of recruiter notes vs client feedback (`PATCH /api/applications/:id/notes`):
+  - Recruiter notes are completely redacted (`undefined`) in all client responses.
+  - Client attempts to mutate `recruiterNotes` immediately rejected with `403 Forbidden`.
+  - Recruiter updates to notes create internal activity logs; client feedback creates client-visible activity logs.
+- [x] Candidate talent profile and multi-job application view (`GET /api/candidates/:id`, `GET /api/candidates`):
+  - Independent stage tracking across different job applications for the same candidate.
+  - Authorized private resume access with time-limited signed URLs or streams.
+- [x] Frontend Recruiter UI in `apps/web`:
+  - `DashboardView.tsx`: Real KPI cards, stage breakdown bars, deadline alerts (clickable navigation), and activity feed.
+  - `JobPipelineView.tsx`: Kanban pipeline with stage columns, count pills, candidate cards, accessible dropdown stage changers, and resume download.
+  - `CandidateProfileModal.tsx`: Comprehensive candidate details, multi-job application selector, stage transition controls, separated "Internal Recruiter Notes" (locked from clients) vs "Client Feedback" editors, and resume download.
+  - Connected into `App.tsx` navigation and `JobsView.tsx` quick actions.
+- [x] Comprehensive test coverage:
+  - 106 automated Vitest tests passing across all workspaces (78 API, 25 Worker, 3 Shared).
+  - 18 dedicated Phase 5 tests in `analytics.test.ts` (5 tests) and `pipeline.test.ts` (13 tests).
+  - Live Supabase PostgreSQL and Storage verified end-to-end via `test_phase5_e2e.mjs`.
 
 ---
 

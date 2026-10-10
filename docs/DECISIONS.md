@@ -69,5 +69,23 @@
   4. **Tenancy Derivation**: `organizationId` and `clientId` are strictly resolved from the database `Job` record, never from untrusted email contents.
   5. **Duplicate Application Policy**: If an application already exists for `(jobId, candidateId)`, the inbound record is marked `status = 'duplicate'`, linking `linkedApplicationId` without re-uploading the resume or creating redundant candidate/application records.
   6. **Compensating Rollback**: If the relational database transaction fails, the uploaded storage file is immediately deleted via compensating cleanup and the record transitions to `failed` (`database_failed`).
-  7. **Unmatched Queue Isolation**: Unmatched records with unassigned tenants are platform-isolated and can only be assigned by Super Admins. Recruiter/Manager access is strictly scoped to their assigned organization.
 - **Consequences**: Zero dropped emails, zero orphaned resume files, strict multi-tenant isolation, and resilient crash recovery.
+
+---
+
+## ADR-009: Strict Recruiter/Client Notes Separation, Transactional Stage Progression & Live DB Aggregations
+- **Status**: Accepted
+- **Context**: Recruitment workflows require sensitive internal notes (salary negotiations, recruiter hunches, background concerns) that must never be visible or editable by client users. At the same time, pipeline stage movements require an append-only audit trail (`StageHistory` and `ActivityLog`) that can never become desynchronized or orphaned. Furthermore, dashboard metrics must reflect live ground truth rather than hardcoded mock figures.
+- **Decision**:
+  1. **Strict Notes Separation**:
+     - `recruiterNotes`: Internal only. Scoped out (`undefined`) in all responses delivered to client users. Any client attempt to write to `recruiterNotes` is rejected with `403 Forbidden` (`FORBIDDEN`).
+     - `clientFeedback`: Shared note field where clients leave ratings, feedback, and notes. Accessible to both clients and internal recruiters.
+  2. **Atomic Stage Progression**:
+     - Application stage update, `StageHistory` creation, and `ActivityLog` creation occur within a single PostgreSQL `$transaction`.
+     - The actor ID is strictly verified against `UserProfile.id` with safe fallback to `null` for system callers, preserving foreign key integrity.
+     - Clients may only transition applications currently in `Client Review` stage; all other stages require `manager`, `recruiter`, or `super_admin` roles.
+  3. **Real Database Aggregations for Analytics**:
+     - All metrics (`totalJobs`, `publishedJobs`, `draftJobs`, `closedJobs`, `totalCandidates`, `recentApplicationsCount`, stage breakdown, `jobsApproachingDeadline`) are derived from database count and filter aggregations in UTC time.
+     - Zero fake/sample data: an empty organization returns honest zeros (`0`, `[]`).
+- **Consequences**: Absolute confidentiality of agency notes, guaranteed referential and transactional integrity of hiring histories, and reliable real-time metrics.
+

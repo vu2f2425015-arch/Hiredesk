@@ -215,5 +215,6 @@ System-wide audit trail.
 - `entityId`: UUID NOT NULL
 - `action`: VarChar(100) NOT NULL
 - `details`: JSONB DEFAULT '{}'
+- `visibility`: VarChar(50) DEFAULT 'internal' (`internal`, `client_visible`)
 - `timestamp`: Timestamp with time zone DEFAULT now()
-- **Indexes**: `(organizationId, timestamp)`
+- **Indexes**: `(organizationId, timestamp)`, `(organizationId, visibility)`

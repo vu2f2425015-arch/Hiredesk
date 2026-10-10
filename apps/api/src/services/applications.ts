@@ -2,6 +2,10 @@ import { prisma, allocateNextCandidateCode } from '@hiredesk/database';
 import {
   PublicApplyInput,
   ApplicationQueryInput,
+  CandidateQueryInput,
+  StageTransitionInput,
+  UpdateNotesInput,
+  ApplicationStage,
   JobStatus,
   UserRole,
 } from '@hiredesk/shared';
@@ -365,7 +369,8 @@ export class ApplicationService {
   }
 
   /**
-   * Retrieves single application with authorization check.
+   * Retrieves single application with authorization check,
+   * chronologically ordered stage histories, and client-sensitive note redaction.
    */
   static async getApplicationById(user: AuthenticatedUser, applicationId: string) {
     const app = await prisma.application.findUnique({
@@ -376,6 +381,14 @@ export class ApplicationService {
           select: { id: true, jobCode: true, title: true, organizationId: true, clientId: true },
         },
         resumes: true,
+        stageHistories: {
+          orderBy: { timestamp: 'asc' },
+          include: {
+            actor: {
+              select: { id: true, firstName: true, lastName: true, role: true },
+            },
+          },
+        },
       },
     });
 
@@ -402,7 +415,546 @@ export class ApplicationService {
       throw err;
     }
 
+    // Hard separation: client role must NEVER see internal recruiterNotes
+    if (user.role === UserRole.CLIENT) {
+      const { recruiterNotes: _rn, ...safeApp } = app;
+      return safeApp;
+    }
+
     return app;
+  }
+
+  /**
+   * Transitions an application's stage, creating StageHistory and ActivityLog atomically in a transaction.
+   */
+  static async transitionStage(
+    user: AuthenticatedUser,
+    applicationId: string,
+    input: StageTransitionInput
+  ) {
+    const app = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: {
+        job: true,
+        candidate: true,
+      },
+    });
+
+    if (!app) {
+      const err = new Error('Application not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    // Tenant check
+    if (user.role !== UserRole.SUPER_ADMIN && app.organizationId !== user.organizationId) {
+      const err = new Error('Application not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    // Client role boundary check:
+    // Clients can only act on applications currently in 'Client Review' stage
+    if (user.role === UserRole.CLIENT) {
+      if (app.clientId !== user.clientId) {
+        const err = new Error('Application not found');
+        (err as any).statusCode = 404;
+        (err as any).code = 'NOT_FOUND';
+        throw err;
+      }
+
+      if (app.stage !== ApplicationStage.CLIENT_REVIEW) {
+        const err = new Error('Client users can only transition applications currently in Client Review');
+        (err as any).statusCode = 403;
+        (err as any).code = 'FORBIDDEN';
+        throw err;
+      }
+    }
+
+    const previousStage = app.stage;
+    const nextStage = input.stage;
+
+    // Atomically update Application, insert StageHistory, and insert ActivityLog
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedApp = await tx.application.update({
+        where: { id: app.id },
+        data: {
+          stage: nextStage,
+          updatedAt: new Date(),
+        },
+      });
+
+      // Ensure actorId satisfies foreign key constraint or null for system/unregistered callers
+      let actorIdToPersist: string | null = null;
+      if (user.id && (tx as any).userProfile?.findUnique) {
+        const actorProfile = await tx.userProfile.findUnique({
+          where: { id: user.id },
+          select: { id: true },
+        });
+        if (actorProfile) {
+          actorIdToPersist = actorProfile.id;
+        }
+      }
+
+      await tx.stageHistory.create({
+        data: {
+          applicationId: app.id,
+          previousStage,
+          nextStage,
+          actorId: actorIdToPersist,
+          reason: input.reason || `Stage updated from ${previousStage} to ${nextStage} by ${user.role}`,
+        },
+      });
+
+      await tx.activityLog.create({
+        data: {
+          organizationId: app.organizationId,
+          actorId: user.id,
+          entityType: 'application',
+          entityId: app.id,
+          action: 'stage_transition',
+          details: {
+            fromStage: previousStage,
+            toStage: nextStage,
+            reason: input.reason || null,
+            jobCode: app.job.jobCode,
+            candidateCode: app.candidate.candidateCode,
+          },
+          visibility: user.role === UserRole.CLIENT ? 'client_visible' : 'internal',
+        },
+      });
+
+      return updatedApp;
+    });
+
+    return ApplicationService.getApplicationById(user, updated.id);
+  }
+
+  /**
+   * Updates internal recruiter notes and/or client feedback with strict role enforcement.
+   */
+  static async updateApplicationNotes(
+    user: AuthenticatedUser,
+    applicationId: string,
+    input: UpdateNotesInput
+  ) {
+    const app = await prisma.application.findUnique({
+      where: { id: applicationId },
+      include: { job: true, candidate: true },
+    });
+
+    if (!app) {
+      const err = new Error('Application not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    // Tenant check
+    if (user.role !== UserRole.SUPER_ADMIN && app.organizationId !== user.organizationId) {
+      const err = new Error('Application not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    // Client role boundary check
+    if (user.role === UserRole.CLIENT) {
+      if (app.clientId !== user.clientId) {
+        const err = new Error('Application not found');
+        (err as any).statusCode = 404;
+        (err as any).code = 'NOT_FOUND';
+        throw err;
+      }
+
+      // Hard check: client user cannot edit internal recruiter notes
+      if (input.recruiterNotes !== undefined) {
+        const err = new Error('Client users cannot modify internal recruiter notes');
+        (err as any).statusCode = 403;
+        (err as any).code = 'FORBIDDEN';
+        throw err;
+      }
+    }
+
+    const data: any = { updatedAt: new Date() };
+    if (input.recruiterNotes !== undefined && user.role !== UserRole.CLIENT) {
+      data.recruiterNotes = input.recruiterNotes;
+    }
+    if (input.clientFeedback !== undefined) {
+      data.clientFeedback = input.clientFeedback;
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const res = await tx.application.update({
+        where: { id: app.id },
+        data,
+      });
+
+      await tx.activityLog.create({
+        data: {
+          organizationId: app.organizationId,
+          actorId: user.id,
+          entityType: 'application',
+          entityId: app.id,
+          action: 'application_notes_updated',
+          details: {
+            hasRecruiterNotes: input.recruiterNotes !== undefined,
+            hasClientFeedback: input.clientFeedback !== undefined,
+            jobCode: app.job.jobCode,
+            candidateCode: app.candidate.candidateCode,
+          },
+          visibility: input.clientFeedback !== undefined ? 'client_visible' : 'internal',
+        },
+      });
+
+      return res;
+    });
+
+    return ApplicationService.getApplicationById(user, updated.id);
+  }
+
+  /**
+   * Retrieves all applications for a specific job grouped by pipeline stage.
+   */
+  static async listPipelineForJob(user: AuthenticatedUser, jobId: string) {
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+      include: { client: { select: { id: true, name: true } } },
+    });
+
+    if (!job) {
+      const err = new Error('Job not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    // Tenant check
+    if (user.role !== UserRole.SUPER_ADMIN && job.organizationId !== user.organizationId) {
+      const err = new Error('Job not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    // Client role boundary check
+    if (user.role === UserRole.CLIENT && job.clientId !== user.clientId) {
+      const err = new Error('Job not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    const applications = await prisma.application.findMany({
+      where: {
+        jobId: job.id,
+        organizationId: job.organizationId,
+      },
+      orderBy: { appliedAt: 'desc' },
+      include: {
+        candidate: {
+          select: {
+            id: true,
+            candidateCode: true,
+            name: true,
+            normalizedEmail: true,
+            phone: true,
+            location: true,
+            skills: true,
+          },
+        },
+        resumes: {
+          select: {
+            id: true,
+            originalFilename: true,
+            fileSize: true,
+            contentType: true,
+            uploadedAt: true,
+          },
+        },
+        stageHistories: {
+          orderBy: { timestamp: 'desc' },
+          take: 1,
+          select: { timestamp: true, reason: true },
+        },
+      },
+    });
+
+    // Group by canonical stages
+    const stages: Record<string, any[]> = {
+      [ApplicationStage.APPLIED]: [],
+      [ApplicationStage.SCREENING]: [],
+      [ApplicationStage.SHORTLISTED]: [],
+      [ApplicationStage.INTERVIEW]: [],
+      [ApplicationStage.AI_INTERVIEW]: [],
+      [ApplicationStage.CLIENT_REVIEW]: [],
+      [ApplicationStage.SELECTED]: [],
+      [ApplicationStage.HIRED]: [],
+      [ApplicationStage.REJECTED]: [],
+      [ApplicationStage.WITHDRAWN]: [],
+    };
+
+    for (const app of applications) {
+      const safeApp = {
+        id: app.id,
+        candidateId: app.candidateId,
+        jobId: app.jobId,
+        stage: app.stage,
+        source: app.source,
+        appliedAt: app.appliedAt.toISOString(),
+        clientFeedback: app.clientFeedback,
+        recruiterNotes: user.role === UserRole.CLIENT ? undefined : app.recruiterNotes,
+        candidate: app.candidate,
+        resumes: app.resumes.map((r) => ({
+          ...r,
+          uploadedAt: r.uploadedAt.toISOString(),
+        })),
+        lastStageChange: app.stageHistories[0]
+          ? {
+              timestamp: app.stageHistories[0].timestamp.toISOString(),
+              reason: app.stageHistories[0].reason,
+            }
+          : null,
+      };
+
+      if (stages[app.stage]) {
+        stages[app.stage].push(safeApp);
+      } else {
+        stages[app.stage] = [safeApp];
+      }
+    }
+
+    const counts: Record<string, number> = {};
+    for (const [stageName, appList] of Object.entries(stages)) {
+      counts[stageName] = appList.length;
+    }
+
+    return {
+      job: {
+        id: job.id,
+        jobCode: job.jobCode,
+        title: job.title,
+        status: job.status,
+        client: job.client,
+      },
+      stages,
+      counts,
+      totalApplications: applications.length,
+    };
+  }
+
+  /**
+   * Retrieves candidate profile including all multi-job applications within authorized scope.
+   */
+  static async getCandidateById(user: AuthenticatedUser, candidateId: string) {
+    const candidate = await prisma.candidate.findUnique({
+      where: { id: candidateId },
+      include: {
+        resumes: {
+          orderBy: { uploadedAt: 'desc' },
+        },
+        applications: {
+          orderBy: { appliedAt: 'desc' },
+          include: {
+            job: {
+              select: {
+                id: true,
+                jobCode: true,
+                title: true,
+                status: true,
+                clientId: true,
+                client: { select: { name: true } },
+              },
+            },
+            resumes: true,
+            stageHistories: {
+              orderBy: { timestamp: 'desc' },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+
+    if (!candidate) {
+      const err = new Error('Candidate not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    // Tenant check
+    if (user.role !== UserRole.SUPER_ADMIN && candidate.organizationId !== user.organizationId) {
+      const err = new Error('Candidate not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    // Client role boundary check
+    if (user.role === UserRole.CLIENT) {
+      // Must have applied to at least one job belonging to user.clientId
+      const hasClientJob = candidate.applications.some((a) => a.clientId === user.clientId);
+      if (!hasClientJob) {
+        const err = new Error('Candidate not found');
+        (err as any).statusCode = 404;
+        (err as any).code = 'NOT_FOUND';
+        throw err;
+      }
+    }
+
+    // Filter applications if client user
+    const filteredApplications = candidate.applications
+      .filter((app) => {
+        if (user.role === UserRole.CLIENT) {
+          return app.clientId === user.clientId;
+        }
+        return true;
+      })
+      .map((app) => ({
+        id: app.id,
+        jobId: app.jobId,
+        stage: app.stage,
+        source: app.source,
+        appliedAt: app.appliedAt.toISOString(),
+        clientFeedback: app.clientFeedback,
+        recruiterNotes: user.role === UserRole.CLIENT ? undefined : app.recruiterNotes,
+        job: app.job,
+        resumes: app.resumes,
+        lastStageChange: app.stageHistories[0] || null,
+      }));
+
+    return {
+      id: candidate.id,
+      candidateCode: candidate.candidateCode,
+      name: candidate.name,
+      email: candidate.normalizedEmail,
+      phone: candidate.phone,
+      location: candidate.location,
+      country: candidate.country,
+      skills: candidate.skills,
+      education: candidate.education,
+      experience: candidate.experience,
+      createdAt: candidate.createdAt.toISOString(),
+      updatedAt: candidate.updatedAt.toISOString(),
+      applications: filteredApplications,
+      resumes: candidate.resumes,
+    };
+  }
+
+  /**
+   * Lists / searches candidates within caller's organization.
+   */
+  static async listCandidates(user: AuthenticatedUser, query: CandidateQueryInput) {
+    if (user.role === UserRole.CLIENT) {
+      // Client users list candidates who have applied to client's jobs
+      const appWhere = {
+        clientId: user.clientId!,
+        organizationId: user.organizationId!,
+      };
+      const candidateIds = await prisma.application
+        .groupBy({ by: ['candidateId'], where: appWhere })
+        .then((rows) => rows.map((r) => r.candidateId));
+
+      const where: any = {
+        id: { in: candidateIds },
+      };
+
+      if (query.search) {
+        where.OR = [
+          { name: { contains: query.search, mode: 'insensitive' } },
+          { normalizedEmail: { contains: query.search.toLowerCase(), mode: 'insensitive' } },
+          { candidateCode: { contains: query.search, mode: 'insensitive' } },
+        ];
+      }
+
+      const page = query.page || 1;
+      const limit = query.limit || 20;
+      const skip = (page - 1) * limit;
+
+      const [total, items] = await Promise.all([
+        prisma.candidate.count({ where }),
+        prisma.candidate.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            applications: {
+              where: { clientId: user.clientId || undefined },
+              select: { id: true, stage: true, jobId: true },
+            },
+          },
+        }),
+      ]);
+
+      return {
+        candidates: items.map((c) => ({
+          id: c.id,
+          candidateCode: c.candidateCode,
+          name: c.name,
+          email: c.normalizedEmail,
+          phone: c.phone,
+          location: c.location,
+          skills: c.skills,
+          applicationsCount: c.applications.length,
+          createdAt: c.createdAt.toISOString(),
+        })),
+        total,
+        page,
+        limit,
+      };
+    }
+
+    // Manager / Recruiter / Super Admin
+    const where: any = {};
+    if (user.role !== UserRole.SUPER_ADMIN) {
+      where.organizationId = user.organizationId;
+    }
+
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { normalizedEmail: { contains: query.search.toLowerCase(), mode: 'insensitive' } },
+        { candidateCode: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const page = query.page || 1;
+    const limit = query.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const [total, items] = await Promise.all([
+      prisma.candidate.count({ where }),
+      prisma.candidate.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: { select: { applications: true } },
+        },
+      }),
+    ]);
+
+    return {
+      candidates: items.map((c) => ({
+        id: c.id,
+        candidateCode: c.candidateCode,
+        name: c.name,
+        email: c.normalizedEmail,
+        phone: c.phone,
+        location: c.location,
+        skills: c.skills,
+        applicationsCount: c._count.applications,
+        createdAt: c.createdAt.toISOString(),
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   /**
@@ -434,3 +986,4 @@ export class ApplicationService {
     };
   }
 }
+
