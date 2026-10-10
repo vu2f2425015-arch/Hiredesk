@@ -7,30 +7,32 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ## Phase Roadmap & Status
 
-### [IN PROGRESS] Phase 0 — Monorepo Scaffold & Standards
+### [COMPLETED] Phase 0 — Monorepo Scaffold & Standards
 - [x] Create project documentation (`PRODUCT_SPEC.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `SECURITY_MODEL.md`, `IMPLEMENTATION_PLAN.md`, `ACCEPTANCE_TESTS.md`, `DECISIONS.md`).
-- [ ] Initialize Git repository and `.gitignore`.
-- [ ] Create root `package.json` with npm workspaces (`apps/*`, `packages/*`).
-- [ ] Configure root TypeScript and workspace `tsconfig.json` files.
-- [ ] Implement `packages/shared` with core TypeScript enums (`UserRole`, `JobStatus`, `ApplicationStage`, `InboundStatus`) and shared Zod schemas.
-- [ ] Implement `packages/database` with Prisma schema for core entities.
-- [ ] Implement `apps/api` with Express + TypeScript:
-  - [ ] Correlation ID middleware (`x-request-id`).
-  - [ ] Security middleware (Helmet, CORS).
-  - [ ] Structured logger (Pino with PII redaction).
-  - [ ] Standardized error handler and response envelope.
-  - [ ] `/health` endpoint returning system status, timestamp, uptime, and version.
-  - [ ] Unit/Integration tests for `/health` with Vitest and Supertest.
-- [ ] Implement `apps/worker` with TypeScript:
-  - [ ] Worker lifecycle runner with graceful shutdown handlers.
-  - [ ] Healthcheck/status logging.
-- [ ] Implement `apps/web` with React + Vite + TypeScript:
-  - [ ] Responsive web shell with modern design tokens.
-  - [ ] React Router navigation for implemented views.
-  - [ ] Honest empty states and navigation skeleton.
-- [ ] Create `.env.example` with documented configuration templates.
-- [ ] Create root `README.md` with setup instructions.
-- [ ] Run lint, type-check, and tests across all workspaces.
+- [x] Initialize Git repository and `.gitignore`.
+- [x] Create root `package.json` with npm workspaces (`apps/*`, `packages/*`).
+- [x] Configure root TypeScript and workspace `tsconfig.json` files.
+- [x] Implement `packages/shared` with core TypeScript enums (`UserRole`, `JobStatus`, `ApplicationStage`, `InboundStatus`) and shared Zod schemas.
+- [x] Implement `packages/database` with Prisma schema for core entities.
+- [x] Implement `apps/api` with Express + TypeScript:
+  - [x] Correlation ID middleware (`x-request-id`).
+  - [x] Security middleware (Helmet, CORS).
+  - [x] Structured logger (Pino with PII redaction).
+  - [x] Standardized error handler and response envelope.
+  - [x] `/health` endpoint returning system status, timestamp, uptime, and version.
+  - [x] Unit/Integration tests for `/health` with Vitest and Supertest.
+- [x] Implement `apps/worker` with TypeScript:
+  - [x] Worker lifecycle runner with graceful shutdown handlers.
+  - [x] Pure `jobCodeExtractor` supporting dash variants, case insensitivity, and body fallbacks.
+  - [x] Unit test suite covering 9 normalization and edge-case scenarios.
+- [x] Implement `apps/web` with React + Vite + TypeScript:
+  - [x] Responsive web shell with modern design tokens and theme.
+  - [x] React Router navigation for implemented views.
+  - [x] Live system diagnostic inspection querying `/api/health`.
+  - [x] Honest empty states and navigation skeleton without fake data.
+- [x] Create `.env.example` with documented configuration templates.
+- [x] Create root `README.md` with setup instructions.
+- [x] Run lint, type-check, and tests across all workspaces.
 
 ---
 
