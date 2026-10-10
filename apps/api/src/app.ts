@@ -8,6 +8,9 @@ import { logger } from './utils/logger.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { healthRouter } from './routes/health.js';
+import { meRouter } from './routes/me.js';
+import { bootstrapRouter } from './routes/bootstrap.js';
+import { adminRouter } from './routes/admin.js';
 import { sendError } from './utils/response.js';
 
 export function createApp(): Express {
@@ -37,6 +40,9 @@ export function createApp(): Express {
   // Mount Routes
   app.use(healthRouter);
   app.use('/api', healthRouter);
+  app.use('/api', meRouter);
+  app.use('/api', bootstrapRouter);
+  app.use('/api', adminRouter);
 
   // Fallthrough 404 handler
   app.use((req: Request, res: Response) => {

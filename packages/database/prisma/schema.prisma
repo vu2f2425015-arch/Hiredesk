@@ -26,7 +26,8 @@ model Organization {
 }
 
 model UserProfile {
-  id             String        @id // Corresponds to Supabase auth.users.id
+  id             String        @id @default(uuid())
+  authUserId     String        @unique // Supabase auth.users.id UUID
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   role           String        // super_admin, manager, recruiter, client
@@ -34,12 +35,14 @@ model UserProfile {
   client         Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   firstName      String
   lastName       String
+  fullName       String?
   email          String
-  active         Boolean       @default(true)
+  isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   stageHistories StageHistory[]
 
+  @@index([authUserId])
   @@index([organizationId])
   @@index([clientId])
   @@index([email])

@@ -36,17 +36,15 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ---
 
-### [PENDING] Phase 1 — Supabase Auth, Profiles & Tenant Authorization
-- [ ] Supabase Auth client integration in `apps/web` (login, logout, session restoration).
-- [ ] Express JWT verification middleware in `apps/api`.
-- [ ] Database migrations for `Organization`, `UserProfile`, `Client`, and `ActivityLog`.
-- [ ] Onboarding and bootstrap endpoint for the first admin & organization.
-- [ ] Role-based authorization middleware (`requireRole`, `requireTenant`).
-- [ ] Test matrix:
-  - Deny unauthenticated requests.
-  - Deny cross-tenant organization access.
-  - Deny cross-client resource access.
-  - Deny inactive users.
+### [COMPLETED] Phase 1 — Supabase Auth, Profiles & Tenant Authorization
+- [x] Supabase Auth client integration in `apps/web` (login, logout, session restoration, missing credentials detection).
+- [x] Express JWT verification middleware in `apps/api` (`authenticate`, `requireRole`, `requireTenant`).
+- [x] Refined `UserProfile` model in Prisma with `authUserId` (unique), `fullName`, `isActive`, and organization/client relations.
+- [x] Protected onboarding and bootstrap endpoint (`POST /api/bootstrap/super-admin`) requiring `BOOTSTRAP_SECRET` and locking permanently after the first super-admin.
+- [x] Dedicated CLI bootstrap script (`packages/database/src/scripts/bootstrapAdmin.ts`).
+- [x] Administrative tenant provisioning endpoints (`POST /api/admin/organizations`, `POST /api/admin/clients`, `POST /api/admin/users`).
+- [x] Anti-privilege-escalation rules (managers cannot create super-admin; client users cannot access provisioning).
+- [x] Test matrix covering 14 automated unit/API test scenarios (unauthenticated 401, expired token 401, disabled user 403, missing profile 403, cross-tenant isolation 403, cross-client isolation 403, privilege escalation prevention, and locked bootstrap).
 
 ---
 

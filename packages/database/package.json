@@ -9,13 +9,15 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "bootstrap:admin": "tsx src/scripts/bootstrapAdmin.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1"
   },
   "devDependencies": {
     "prisma": "^6.4.1",
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3"
   }
 }

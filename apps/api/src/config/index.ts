@@ -15,6 +15,7 @@ const ConfigSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_JWT_SECRET: z.string().optional(),
   STORAGE_BUCKET_RESUMES: z.string().default('resumes'),
+  BOOTSTRAP_SECRET: z.string().default('hiredesk-local-bootstrap-secret'),
 });
 
 const parsed = ConfigSchema.safeParse(process.env);
