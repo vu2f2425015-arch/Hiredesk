@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './pages/AuthView';
+import { JobsView } from './pages/JobsView';
+import { PublicCareerView } from './pages/PublicCareerView';
 
 interface HealthResponse {
   status: string;
@@ -154,7 +156,9 @@ function AppShell() {
         <Routes>
           <Route path="/" element={<OverviewView health={health} loading={loading} error={error} />} />
           <Route path="/login" element={<AuthView />} />
-          <Route path="/jobs" element={<JobsPlaceholderView />} />
+          <Route path="/jobs" element={<JobsView />} />
+          <Route path="/career/:orgSlug" element={<PublicCareerView />} />
+          <Route path="/career/:orgSlug/:jobCode" element={<PublicCareerView />} />
           <Route path="/unmatched" element={<UnmatchedPlaceholderView />} />
           <Route path="/system-status" element={<SystemStatusView health={health} loading={loading} error={error} />} />
         </Routes>
@@ -286,30 +290,6 @@ function OverviewView({
   );
 }
 
-function JobsPlaceholderView() {
-  const { profile } = useAuth();
-
-  return (
-    <div className="empty-state">
-      <Briefcase className="empty-icon" size={48} />
-      <h2 className="empty-title">Job Management Pipeline</h2>
-      <p className="empty-desc">
-        Vacancies, atomic global Job Codes (<code>JOB-1001</code>), and client associations will be unlocked in Phase 2.
-        In compliance with our zero-fake-data policy, no mock jobs are simulated.
-      </p>
-      <div style={{ display: 'inline-flex', gap: '0.75rem', alignItems: 'center' }}>
-        <span className="status-pill status-offline">Phase 2: Pending</span>
-        {profile ? (
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Authorized as: <strong>{profile.role.toUpperCase()}</strong> ({profile.organizationName || 'Platform'})
-          </span>
-        ) : (
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Sign in to prepare your agency workspace</span>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function UnmatchedPlaceholderView() {
   return (

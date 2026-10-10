@@ -48,14 +48,17 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ---
 
-### [PENDING] Phase 2 — Jobs & Atomic Global Job Codes
-- [ ] PostgreSQL atomic sequence (`job_code_seq`) and function for `JOB-1001` format.
-- [ ] Prisma Job schema migration with uniqueness and immutability rules.
-- [ ] Job CRUD endpoints in `apps/api` with Zod validation.
-- [ ] Job management UI in `apps/web` (create, edit, draft, publish, close, filter).
-- [ ] Copy Job Code action.
-- [ ] Public read-only job detail page.
-- [ ] Concurrency tests proving zero duplicate job codes under load.
+### [COMPLETED] Phase 2 — Jobs & Atomic Global Job Codes
+- [x] PostgreSQL atomic sequence (`job_code_seq`) and database migration for `JOB-1001` format.
+- [x] Versioned migration (`packages/database/prisma/migrations/20261011000000_init_jobs_sequence_triggers/migration.sql`) and Supabase migration (`supabase/migrations/`).
+- [x] Trigger function `enforce_job_code_immutability()` protecting `jobCode` from post-creation tampering.
+- [x] Job CRUD endpoints in `apps/api` (`POST /api/jobs`, `GET /api/jobs`, `GET /api/jobs/:id`, `PATCH /api/jobs/:id`, `POST /api/jobs/:id/publish`, `POST /api/jobs/:id/close`, `POST /api/jobs/:id/reopen`, `POST /api/jobs/:id/duplicate`).
+- [x] Zod validation schemas (`CreateJobSchema`, `UpdateJobSchema`, `JobQuerySchema`, `PublicJobDtoSchema`).
+- [x] Strict tenant & client authorization (recruiters locked to their agency org; clients restricted to their own published jobs).
+- [x] Public career endpoints (`GET /api/career/:orgSlug/jobs`, `GET /api/career/:orgSlug/jobs/:jobCode`) returning only published jobs and stripping internal metadata.
+- [x] Frontend Jobs UI in `apps/web` with live search, status filters, Create Job modal with client-side validation, one-click Job Code copy, and detailed drawer view.
+- [x] Frontend Public Career view (`/career/:orgSlug` and `/career/:orgSlug/:jobCode`).
+- [x] Concurrency and immutability test suite with 13 automated tests covering race conditions, client isolation, and duplication.
 
 ---
 
