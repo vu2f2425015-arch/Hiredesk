@@ -1,0 +1,112 @@
+# HiredeskHR — Implementation Plan & Phase Tracking
+
+## Overview
+This document tracks the phased implementation of HiredeskHR. Each phase must be verified with automated checks and tests before proceeding to subsequent phases.
+
+---
+
+## Phase Roadmap & Status
+
+### [IN PROGRESS] Phase 0 — Monorepo Scaffold & Standards
+- [x] Create project documentation (`PRODUCT_SPEC.md`, `ARCHITECTURE.md`, `DATA_MODEL.md`, `SECURITY_MODEL.md`, `IMPLEMENTATION_PLAN.md`, `ACCEPTANCE_TESTS.md`, `DECISIONS.md`).
+- [ ] Initialize Git repository and `.gitignore`.
+- [ ] Create root `package.json` with npm workspaces (`apps/*`, `packages/*`).
+- [ ] Configure root TypeScript and workspace `tsconfig.json` files.
+- [ ] Implement `packages/shared` with core TypeScript enums (`UserRole`, `JobStatus`, `ApplicationStage`, `InboundStatus`) and shared Zod schemas.
+- [ ] Implement `packages/database` with Prisma schema for core entities.
+- [ ] Implement `apps/api` with Express + TypeScript:
+  - [ ] Correlation ID middleware (`x-request-id`).
+  - [ ] Security middleware (Helmet, CORS).
+  - [ ] Structured logger (Pino with PII redaction).
+  - [ ] Standardized error handler and response envelope.
+  - [ ] `/health` endpoint returning system status, timestamp, uptime, and version.
+  - [ ] Unit/Integration tests for `/health` with Vitest and Supertest.
+- [ ] Implement `apps/worker` with TypeScript:
+  - [ ] Worker lifecycle runner with graceful shutdown handlers.
+  - [ ] Healthcheck/status logging.
+- [ ] Implement `apps/web` with React + Vite + TypeScript:
+  - [ ] Responsive web shell with modern design tokens.
+  - [ ] React Router navigation for implemented views.
+  - [ ] Honest empty states and navigation skeleton.
+- [ ] Create `.env.example` with documented configuration templates.
+- [ ] Create root `README.md` with setup instructions.
+- [ ] Run lint, type-check, and tests across all workspaces.
+
+---
+
+### [PENDING] Phase 1 — Supabase Auth, Profiles & Tenant Authorization
+- [ ] Supabase Auth client integration in `apps/web` (login, logout, session restoration).
+- [ ] Express JWT verification middleware in `apps/api`.
+- [ ] Database migrations for `Organization`, `UserProfile`, `Client`, and `ActivityLog`.
+- [ ] Onboarding and bootstrap endpoint for the first admin & organization.
+- [ ] Role-based authorization middleware (`requireRole`, `requireTenant`).
+- [ ] Test matrix:
+  - Deny unauthenticated requests.
+  - Deny cross-tenant organization access.
+  - Deny cross-client resource access.
+  - Deny inactive users.
+
+---
+
+### [PENDING] Phase 2 — Jobs & Atomic Global Job Codes
+- [ ] PostgreSQL atomic sequence (`job_code_seq`) and function for `JOB-1001` format.
+- [ ] Prisma Job schema migration with uniqueness and immutability rules.
+- [ ] Job CRUD endpoints in `apps/api` with Zod validation.
+- [ ] Job management UI in `apps/web` (create, edit, draft, publish, close, filter).
+- [ ] Copy Job Code action.
+- [ ] Public read-only job detail page.
+- [ ] Concurrency tests proving zero duplicate job codes under load.
+
+---
+
+### [PENDING] Phase 3 — Candidate, Application & Public Career Portal
+- [ ] Prisma schema migrations for `Candidate`, `Application`, `Resume`, and `StageHistory`.
+- [ ] Candidate deduplication by `(organizationId, normalizedEmail)`.
+- [ ] Public application submission API with file upload validation (PDF/DOCX, 10MB).
+- [ ] Private Supabase Storage upload integration.
+- [ ] Public career page apply form with responsive UX and honest loading/success states.
+- [ ] Tests for candidate reuse, repeat applications to the same job, and file validation.
+
+---
+
+### [PENDING] Phase 4 — Email Ingestion Worker & Unmatched Queue
+- [ ] IMAP client in `apps/worker` using `imapflow`.
+- [ ] MIME parsing and attachment streaming using `mailparser`.
+- [ ] Job Code extractor (subject line first, body fallback, strict `JOB-\d+`).
+- [ ] Idempotency tracking table `InboundApplication` (mailboxId + UIDVALIDITY + UID).
+- [ ] Unmatched queue management API and UI in `apps/web`.
+- [ ] Manual assignment flow for recruiters to match unparsed emails to jobs.
+- [ ] Offline fixture tests for valid-code, no-code, malformed-code, and duplicate emails.
+
+---
+
+### [PENDING] Phase 5 — Recruiter Dashboard, Candidate Profile & Pipeline
+- [ ] Live database-derived metrics API (active jobs, candidate counts by stage).
+- [ ] Visual candidate pipeline board (Kanban / stage-grouped list) in `apps/web`.
+- [ ] Candidate detail page with resume preview and application history.
+- [ ] Stage transition API with role checks, `StageHistory`, and `ActivityLog`.
+- [ ] Separation of recruiter-internal notes from client-visible notes.
+- [ ] Tests verifying stage persistence across server restarts.
+
+---
+
+### [PENDING] Phase 6 — Client Portal & Isolation Hardening
+- [ ] Client user dashboard restricted to assigned `clientId`.
+- [ ] Client review actions: Shortlist, Reject, Request Interview, Leave Feedback.
+- [ ] Authorization enforcement preventing access to recruiter-only notes.
+- [ ] Negative security tests: attempt cross-client and cross-org access via ID manipulation.
+- [ ] End-to-end critical acceptance test run.
+
+---
+
+### [POST-MVP] Phase 7 — Interviews & Communications
+- [ ] Interview scheduling module with time zones and meeting links.
+- [ ] Email notifications with real SMTP provider integration.
+- [ ] Communication history log.
+
+---
+
+### [POST-MVP] Phase 8 — Talent Pool, Analytics & Decision Support
+- [ ] Organization-wide candidate talent pool search.
+- [ ] SQL-derived analytics and time-to-hire reports.
+- [ ] Explainable AI resume-to-job matching with documented scoring criteria.

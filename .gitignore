@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production builds
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & Secrets (NEVER COMMIT)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# Logs & Temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pino-*.log
+.temp/
+tmp/
+
+# Editor & System
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Existing reference archives
+Zoo-Code-main/
+get-shit-done-main/
+ralph-loop-main/
+skills-main/
