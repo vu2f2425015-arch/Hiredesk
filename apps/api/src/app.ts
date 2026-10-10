@@ -12,6 +12,7 @@ import { meRouter } from './routes/me.js';
 import { bootstrapRouter } from './routes/bootstrap.js';
 import { adminRouter } from './routes/admin.js';
 import { jobsRouter } from './routes/jobs.js';
+import { applicationsRouter } from './routes/applications.js';
 import { sendError } from './utils/response.js';
 
 export function createApp(): Express {
@@ -45,6 +46,7 @@ export function createApp(): Express {
   app.use('/api', bootstrapRouter);
   app.use('/api', adminRouter);
   app.use('/api', jobsRouter);
+  app.use('/api', applicationsRouter);
 
   // Fallthrough 404 handler
   app.use((req: Request, res: Response) => {

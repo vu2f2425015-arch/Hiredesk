@@ -12,11 +12,17 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export type JobCodeAllocator = (client?: PrismaClient) => Promise<string>;
+export type CandidateCodeAllocator = (client?: PrismaClient) => Promise<string>;
 
 let customJobCodeAllocator: JobCodeAllocator | null = null;
+let customCandidateCodeAllocator: CandidateCodeAllocator | null = null;
 
 export function setJobCodeAllocator(allocator: JobCodeAllocator | null): void {
   customJobCodeAllocator = allocator;
+}
+
+export function setCandidateCodeAllocator(allocator: CandidateCodeAllocator | null): void {
+  customCandidateCodeAllocator = allocator;
 }
 
 /**
@@ -32,6 +38,23 @@ export async function allocateNextJobCode(client: PrismaClient = prisma): Promis
   `;
   if (!result || result.length === 0 || !result[0].code) {
     throw new Error('Failed to allocate job code from sequence');
+  }
+  return result[0].code;
+}
+
+/**
+ * Concurrency-safe atomic Candidate Code allocator querying PostgreSQL sequence candidate_code_seq.
+ * Returns formatted code: CAND-1001, CAND-1002, etc.
+ */
+export async function allocateNextCandidateCode(client: PrismaClient = prisma): Promise<string> {
+  if (customCandidateCodeAllocator) {
+    return customCandidateCodeAllocator(client);
+  }
+  const result = await client.$queryRaw<{ code: string }[]>`
+    SELECT 'CAND-' || nextval('candidate_code_seq')::TEXT as code
+  `;
+  if (!result || result.length === 0 || !result[0].code) {
+    throw new Error('Failed to allocate candidate code from sequence');
   }
   return result[0].code;
 }

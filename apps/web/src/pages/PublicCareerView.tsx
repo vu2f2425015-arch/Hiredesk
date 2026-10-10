@@ -1,8 +1,24 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Briefcase, MapPin, Building, ArrowLeft, AlertCircle, RefreshCw } from 'lucide-react';
+import {
+  Briefcase,
+  MapPin,
+  Building,
+  ArrowLeft,
+  AlertCircle,
+  RefreshCw,
+  Upload,
+  CheckCircle,
+  FileText,
+  Send,
+} from 'lucide-react';
 import { PublicJobDto } from '@hiredesk/shared';
-import { fetchPublicCareerJobs, fetchPublicCareerJobByCode } from '../lib/api';
+import {
+  fetchPublicCareerJobs,
+  fetchPublicCareerJobByCode,
+  submitPublicApplication,
+  PublicApplyResult,
+} from '../lib/api';
 
 export function PublicCareerView() {
   const { orgSlug, jobCode } = useParams<{ orgSlug: string; jobCode?: string }>();
@@ -13,10 +29,22 @@ export function PublicCareerView() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Application form state
+  const [applicantName, setApplicantName] = useState<string>('');
+  const [applicantEmail, setApplicantEmail] = useState<string>('');
+  const [applicantPhone, setApplicantPhone] = useState<string>('');
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [honeypot, setHoneypot] = useState<string>('');
+  const [submitting, setSubmitting] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submissionResult, setSubmissionResult] = useState<PublicApplyResult | null>(null);
+
   useEffect(() => {
     if (!orgSlug) return;
     setLoading(true);
     setError(null);
+    setSubmissionResult(null);
+    setFormError(null);
 
     if (jobCode) {
       // Single job detail view
@@ -38,6 +66,62 @@ export function PublicCareerView() {
         .finally(() => setLoading(false));
     }
   }, [orgSlug, jobCode]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormError(null);
+    const file = e.target.files?.[0];
+    if (!file) {
+      setResumeFile(null);
+      return;
+    }
+
+    // Client-side file size check: 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      setFormError(`File size exceeds 10 MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB). Please select a smaller file.`);
+      setResumeFile(null);
+      return;
+    }
+
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!ext || !['pdf', 'docx', 'doc'].includes(ext)) {
+      setFormError('Only PDF, DOCX, and DOC formats are supported.');
+      setResumeFile(null);
+      return;
+    }
+
+    setResumeFile(file);
+  };
+
+  const handleApplicationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!orgSlug || !jobCode || !selectedJob) return;
+
+    if (!resumeFile) {
+      setFormError('Please upload your resume document before submitting.');
+      return;
+    }
+
+    setFormError(null);
+    setSubmitting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('name', applicantName.trim());
+      formData.append('email', applicantEmail.trim());
+      formData.append('phone', applicantPhone.trim());
+      formData.append('resume', resumeFile);
+      if (honeypot) {
+        formData.append('honeypot', honeypot);
+      }
+
+      const result = await submitPublicApplication(orgSlug, jobCode, formData);
+      setSubmissionResult(result);
+    } catch (err: any) {
+      setFormError(err.message || 'Submission failed. Please check your details and try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
@@ -61,7 +145,7 @@ export function PublicCareerView() {
           <p>{error}</p>
         </div>
       ) : selectedJob ? (
-        /* Single Job Detail View */
+        /* Single Job Detail & Application View */
         <div className="glass-card">
           <Link
             to={`/career/${orgSlug}`}
@@ -112,12 +196,166 @@ export function PublicCareerView() {
               </div>
             )}
 
-            <div style={{ padding: '1.25rem', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>Ready to Apply?</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-                Online resume submission and public candidate application pipelines unlock in Phase 3.
-              </p>
-              <span className="status-pill status-offline">Apply Form: Phase 3 Next</span>
+            {/* Application Section */}
+            <div id="apply-section" style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-subtle)' }}>
+              {submissionResult ? (
+                /* Success State */
+                <div style={{ padding: '2rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
+                  <CheckCircle size={48} style={{ color: 'var(--success)', margin: '0 auto 1rem auto' }} />
+                  <h3 style={{ fontSize: '1.4rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                    {submissionResult.isDuplicate ? 'Application Already on File' : 'Application Successfully Submitted!'}
+                  </h3>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: '500px', margin: '0 auto 1.25rem auto', lineHeight: 1.6 }}>
+                    {submissionResult.message}. Your candidate tracking reference is{' '}
+                    <strong style={{ color: 'var(--primary)', fontFamily: 'monospace' }}>{submissionResult.candidateCode}</strong>.
+                    Our recruitment team will review your profile shortly.
+                  </p>
+                  <Link to={`/career/${orgSlug}`} className="btn btn-secondary">
+                    Browse Other Open Roles
+                  </Link>
+                </div>
+              ) : (
+                /* Application Form */
+                <div style={{ padding: '2rem', background: 'rgba(18, 24, 38, 0.6)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)' }}>
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h3 style={{ fontSize: '1.3rem', marginBottom: '0.25rem' }}>Apply for this Position</h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      Please provide your contact information and upload your resume.
+                    </p>
+                  </div>
+
+                  {formError && (
+                    <div style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '0.9rem', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <AlertCircle size={18} />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleApplicationSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    {/* Bot Trap */}
+                    <input
+                      type="text"
+                      name="website"
+                      value={honeypot}
+                      onChange={(e) => setHoneypot(e.target.value)}
+                      style={{ display: 'none' }}
+                      tabIndex={-1}
+                      autoComplete="off"
+                    />
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                          Full Name *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Jane Doe"
+                          value={applicantName}
+                          onChange={(e) => setApplicantName(e.target.value)}
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)', fontSize: '0.9rem' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. jane.doe@example.com"
+                          value={applicantEmail}
+                          onChange={(e) => setApplicantEmail(e.target.value)}
+                          style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)', fontSize: '0.9rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                        Phone Number *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="e.g. +1 (555) 019-2834"
+                        value={applicantPhone}
+                        onChange={(e) => setApplicantPhone(e.target.value)}
+                        style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)', fontSize: '0.9rem' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                        Resume Document * (PDF, DOCX, DOC &bull; Max 10 MB)
+                      </label>
+                      <div
+                        style={{
+                          border: '2px dashed var(--border-subtle)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '1.5rem',
+                          textAlign: 'center',
+                          background: 'rgba(255, 255, 255, 0.01)',
+                          cursor: 'pointer',
+                          transition: 'border-color 0.2s',
+                        }}
+                        onClick={() => document.getElementById('resume-file-input')?.click()}
+                      >
+                        <input
+                          id="resume-file-input"
+                          type="file"
+                          accept=".pdf,.docx,.doc,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                          required
+                          onChange={handleFileChange}
+                          style={{ display: 'none' }}
+                        />
+                        {resumeFile ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--primary)' }}>
+                            <FileText size={24} />
+                            <div style={{ textAlign: 'left' }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{resumeFile.name}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                                {(resumeFile.size / (1024 * 1024)).toFixed(2)} MB &bull; Click to change
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                            <Upload size={28} style={{ color: 'var(--primary)' }} />
+                            <div style={{ fontSize: '0.9rem', color: 'var(--text-main)' }}>
+                              Click or drag and drop to upload your resume
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                              Accepted formats: PDF, DOCX, DOC (max 10 MB)
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={submitting}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.75rem', fontSize: '0.95rem' }}
+                      >
+                        {submitting ? (
+                          <>
+                            <RefreshCw className="pulse-dot" size={16} /> Submitting Application...
+                          </>
+                        ) : (
+                          <>
+                            <Send size={16} /> Submit Application
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -151,7 +389,7 @@ export function PublicCareerView() {
               </div>
 
               <Link to={`/career/${orgSlug}/${job.jobCode}`} className="btn btn-primary" style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
-                View Position
+                View & Apply
               </Link>
             </div>
           ))}

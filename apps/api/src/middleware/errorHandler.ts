@@ -19,6 +19,21 @@ export function errorHandler(
     return;
   }
 
+  if ((err as any).name === 'MulterError') {
+    const multerErr = err as any;
+    if (multerErr.code === 'LIMIT_FILE_SIZE') {
+      sendError(res, 'FILE_TOO_LARGE', 'File size exceeds the 10 MB limit', 400);
+      return;
+    }
+    sendError(res, 'FILE_UPLOAD_ERROR', multerErr.message, 400);
+    return;
+  }
+
+  if ((err as any).statusCode) {
+    sendError(res, (err as any).code || 'BAD_REQUEST', err.message, (err as any).statusCode);
+    return;
+  }
+
   logger.error(
     {
       requestId,

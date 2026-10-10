@@ -12,10 +12,60 @@ export const CandidateCreateSchema = z.object({
 });
 
 export const PublicApplySchema = z.object({
-  name: z.string().min(2, { message: 'Name is required' }),
+  name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
   email: z.string().email({ message: 'Valid email is required' }),
-  phone: z.string().min(5, { message: 'Contact phone is required' }),
+  phone: z.string().min(3, { message: 'Contact phone is required' }).max(50).optional(),
   answers: z.record(z.unknown()).default({}),
+  honeypot: z.string().max(0).optional(),
+});
+
+export const PublicApplyResponseSchema = z.object({
+  applicationId: z.string().uuid(),
+  candidateCode: z.string(),
+  status: z.string(),
+  message: z.string(),
+  isDuplicate: z.boolean().optional(),
+});
+
+export const ApplicationDtoSchema = z.object({
+  id: z.string().uuid(),
+  candidateId: z.string().uuid(),
+  jobId: z.string().uuid(),
+  organizationId: z.string().uuid(),
+  clientId: z.string().uuid(),
+  stage: z.string(),
+  source: z.string(),
+  appliedAt: z.string(),
+  status: z.string(),
+  candidate: z.object({
+    id: z.string().uuid(),
+    candidateCode: z.string(),
+    name: z.string(),
+    email: z.string(),
+    phone: z.string().nullable().optional(),
+    location: z.string().nullable().optional(),
+  }),
+  job: z.object({
+    id: z.string().uuid(),
+    jobCode: z.string(),
+    title: z.string(),
+  }).optional(),
+  resumes: z.array(
+    z.object({
+      id: z.string().uuid(),
+      originalFilename: z.string(),
+      fileSize: z.number(),
+      contentType: z.string(),
+      uploadedAt: z.string(),
+    })
+  ),
+});
+
+export const ApplicationQuerySchema = z.object({
+  stage: z.nativeEnum(ApplicationStage).optional(),
+  search: z.string().max(100).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
 });
 
 export const StageTransitionSchema = z.object({
@@ -25,4 +75,8 @@ export const StageTransitionSchema = z.object({
 
 export type CandidateCreateInput = z.infer<typeof CandidateCreateSchema>;
 export type PublicApplyInput = z.infer<typeof PublicApplySchema>;
+export type PublicApplyResponse = z.infer<typeof PublicApplyResponseSchema>;
+export type ApplicationDto = z.infer<typeof ApplicationDtoSchema>;
+export type ApplicationQueryInput = z.infer<typeof ApplicationQuerySchema>;
 export type StageTransitionInput = z.infer<typeof StageTransitionSchema>;
+

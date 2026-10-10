@@ -62,13 +62,19 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ---
 
-### [PENDING] Phase 3 — Candidate, Application & Public Career Portal
-- [ ] Prisma schema migrations for `Candidate`, `Application`, `Resume`, and `StageHistory`.
-- [ ] Candidate deduplication by `(organizationId, normalizedEmail)`.
-- [ ] Public application submission API with file upload validation (PDF/DOCX, 10MB).
-- [ ] Private Supabase Storage upload integration.
-- [ ] Public career page apply form with responsive UX and honest loading/success states.
-- [ ] Tests for candidate reuse, repeat applications to the same job, and file validation.
+### [COMPLETED] Phase 3 — Candidate, Application & Public Career Portal
+- [x] Prisma schema migrations for `Candidate`, `Application`, `Resume`, and `StageHistory`.
+- [x] Candidate deduplication by `(organizationId, normalizedEmail)` with conservative trimming and lowercasing.
+- [x] Atomic candidate code allocation (`CAND-1001` upwards) querying PostgreSQL sequence `candidate_code_seq`.
+- [x] Application idempotency strategy on `(jobId, candidateId)` preventing duplicate rows or storage waste on retries.
+- [x] Public application submission API (`POST /api/career/:orgSlug/jobs/:jobCode/applications` and `/apply`) with multipart resume file upload.
+- [x] Strict server-side file upload validation (PDF/DOCX/DOC, magic bytes inspection, 10 MB limit, filename sanitization).
+- [x] Private Supabase Storage integration in bucket `resumes` with partial failure rollback handling (deleting orphaned files if database fails).
+- [x] Honeypot spam trap detection and rate limiting (20 requests / 15 minutes per IP).
+- [x] Public career page apply form in `apps/web` with responsive UX, client validation, honest upload states, and confirmation card.
+- [x] Recruiter applicant pipeline in `JobsView` drawer displaying real applications, candidate codes, and 60-second signed resume download URLs.
+- [x] Authorized recruiter/client endpoints (`GET /api/jobs/:jobId/applications`, `GET /api/applications/:id`, `GET /api/applications/:id/resume`) with strict tenant and client boundaries.
+- [x] Comprehensive test suite in `apps/api/tests/applications.test.ts` (19 automated tests) covering all 29 verification criteria.
 
 ---
 

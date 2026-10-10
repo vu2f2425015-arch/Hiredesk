@@ -185,3 +185,84 @@ export async function fetchPublicCareerJobByCode(orgSlug: string, jobCode: strin
   }
   return json.data;
 }
+
+export interface PublicApplyResult {
+  applicationId: string;
+  candidateCode: string;
+  status: string;
+  message: string;
+  isDuplicate?: boolean;
+}
+
+export async function submitPublicApplication(
+  orgSlug: string,
+  jobCode: string,
+  formData: FormData
+): Promise<PublicApplyResult> {
+  const res = await fetch(`/api/career/${orgSlug}/jobs/${jobCode}/applications`, {
+    method: 'POST',
+    body: formData,
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to submit application');
+  }
+  return json.data;
+}
+
+export interface ApplicationItem {
+  id: string;
+  candidateId: string;
+  jobId: string;
+  stage: string;
+  source: string;
+  appliedAt: string;
+  status: string;
+  candidate: {
+    id: string;
+    candidateCode: string;
+    name: string;
+    email: string;
+    phone?: string | null;
+    location?: string | null;
+  };
+  resumes: Array<{
+    id: string;
+    originalFilename: string;
+    fileSize: number;
+    contentType: string;
+    uploadedAt: string;
+  }>;
+}
+
+export async function fetchJobApplications(
+  token: string,
+  jobId: string
+): Promise<{ applications: ApplicationItem[]; total: number }> {
+  const res = await fetch(`/api/jobs/${jobId}/applications`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch applications');
+  }
+  return {
+    applications: json.data,
+    total: json.meta?.total || json.data.length,
+  };
+}
+
+export async function fetchResumeDownloadUrl(
+  token: string,
+  applicationId: string
+): Promise<{ signedUrl: string; filename: string }> {
+  const res = await fetch(`/api/applications/${applicationId}/resume`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch resume download URL');
+  }
+  return json.data;
+}
+
