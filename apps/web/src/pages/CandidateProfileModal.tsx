@@ -380,6 +380,17 @@ export function CandidateProfileModal({
                         )}
                         <span>Download Resume</span>
                       </button>
+
+                      {!isClient && (
+                        <a
+                          href="/interviews"
+                          className="btn btn-primary"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', textDecoration: 'none' }}
+                        >
+                          <Calendar size={14} />
+                          <span>Schedule Interview</span>
+                        </a>
+                      )}
                     </div>
                   </div>
 
@@ -396,8 +407,19 @@ export function CandidateProfileModal({
                         gap: '0.4rem',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-cyan)', fontWeight: 600, fontSize: '0.85rem' }}>
-                        <Calendar size={16} /> Pending Client Interview Request
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-cyan)', fontWeight: 600, fontSize: '0.85rem' }}>
+                          <Calendar size={16} /> Pending Client Interview Request
+                        </div>
+                        {!isClient && (
+                          <a
+                            href="/interviews"
+                            className="btn btn-secondary"
+                            style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', textDecoration: 'none', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }}
+                          >
+                            Coordinate Scheduling &rarr;
+                          </a>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         Client requested an interview on {new Date((activeApplication as any).interviewRequests[0].createdAt).toLocaleDateString()}.

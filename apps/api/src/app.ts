@@ -16,6 +16,7 @@ import { applicationsRouter } from './routes/applications.js';
 import { inboundRouter } from './routes/inbound.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { clientPortalRouter } from './routes/clientPortal.js';
+import { interviewsRouter } from './routes/interviews.js';
 import { sendError } from './utils/response.js';
 
 export function createApp(): Express {
@@ -53,6 +54,8 @@ export function createApp(): Express {
   app.use('/api', inboundRouter);
   app.use('/api', analyticsRouter);
   app.use('/api', clientPortalRouter);
+  app.use('/api', interviewsRouter);
+
 
   // Fallthrough 404 handler
   app.use((req: Request, res: Response) => {

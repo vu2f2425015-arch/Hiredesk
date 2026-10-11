@@ -55,3 +55,44 @@ export enum InterviewRequestStatus {
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
 }
+
+export enum InterviewType {
+  VIDEO = 'video',
+  PHONE = 'phone',
+  ONSITE = 'onsite',
+  TECHNICAL = 'technical',
+  OTHER = 'other',
+}
+
+export enum InterviewStatus {
+  SCHEDULED = 'scheduled',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+  NO_SHOW = 'no_show',
+  RESCHEDULED = 'rescheduled',
+}
+
+export enum MeetingProvider {
+  GOOGLE_MEET = 'google_meet',
+  ZOOM = 'zoom',
+  TEAMS = 'teams',
+  PHONE = 'phone',
+  ONSITE = 'onsite',
+  OTHER = 'other',
+}
+
+export enum CommunicationStatus {
+  QUEUED = 'queued',
+  SENDING = 'sending',
+  SENT = 'sent',
+  FAILED = 'failed',
+}
+
+export enum CommunicationTemplateId {
+  INTERVIEW_INVITATION = 'interview_invitation',
+  INTERVIEW_CLIENT_NOTICE = 'interview_client_notice',
+  INTERVIEW_RESCHEDULED = 'interview_rescheduled',
+  INTERVIEW_CANCELLED = 'interview_cancelled',
+  INTERVIEW_COMPLETED = 'interview_completed',
+}
+

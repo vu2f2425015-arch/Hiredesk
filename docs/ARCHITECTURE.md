@@ -82,6 +82,7 @@ graph TD
     subgraph External Systems
         MB[Shared Email Mailbox / IMAP]
         PJ[Job Aggregators / PyjamaHR / LinkedIn]
+        SMTP[SMTP Email Server / Hostinger]
     end
 
     W -->|1. Sign in / Obtain JWT| SA
@@ -89,6 +90,7 @@ graph TD
     API -->|3. Validate JWT & Resolve UserProfile| SA
     API -->|4. Scoped Queries & Mutations| DB
     API -->|5. Generate Signed Download URL for Resume| SS
+    API -->|6. Process Outbound Email Queue| SMTP
 
     PJ -->|Candidate applies via email| MB
     WKR -->|Poll / IDLE IMAP over TLS| MB
@@ -152,3 +154,27 @@ Structured logging uses `pino`:
   - Email bodies (HTML and raw text)
   - Extracted resume text beyond metadata summary
   - Candidate phone numbers in audit logs
+
+---
+
+## 6. Interview Scheduling & Communications Outbox Architecture (Phase 7)
+
+1. **Transactional Outbox Pattern**:
+   - When an interview is scheduled, rescheduled, or cancelled, email notifications are written to `OutboundCommunication` in the same database transaction.
+   - Guaranteed against ghost bookings: if the database transaction aborts, no emails are dispatched; if email fails, the interview record is not lost.
+2. **SMTP Transport & Resilience**:
+   - Nodemailer configured via TLS / port 465 or STARTTLS / port 587.
+   - Transient failure handling: connection resets, timeouts (ETIMEDOUT, ECONNRESET, 421/450/451) trigger exponential backoff.
+   - Permanent failure handling: invalid recipients, relay rejection (550/553) immediately fail without infinite retry loops.
+   - Unconfigured safety: If SMTP variables are missing, records are marked `status: 'failed'` with code `SMTP_NOT_CONFIGURED` without crashing the application.
+3. **Pure RFC 5545 iCalendar (.ics) Engine**:
+   - Clean UTF-8 `.ics` generation adhering strictly to RFC 5545.
+   - Stable UID (`interview-{id}@hiredeskhr.com`).
+   - Sequence tracking (`SEQUENCE: 0` for initial booking, incremented on reschedule).
+   - Method declarations: `METHOD:REQUEST` for invites, `METHOD:CANCEL` for cancellations with `STATUS:CANCELLED`.
+   - Attached as `text/calendar; method=...` MIME part in emails and accessible via authenticated download routes.
+4. **Client Portal Hardening**:
+   - Client users can access interviews strictly for jobs where `job.clientId == caller.clientId`.
+   - Recruiter notes are stripped at the service layer prior to response serialization.
+   - Client access to interview actions is strictly read-only.
+

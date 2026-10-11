@@ -4,6 +4,7 @@ import {
   JobStatus,
   ApplicationStage,
   InterviewRequestStatus,
+  InterviewStatus,
   ClientPortalShortlistInput,
   ClientPortalRejectInput,
   ClientPortalRequestInterviewInput,
@@ -13,6 +14,7 @@ import {
 } from '@hiredesk/shared';
 import { AuthenticatedUser } from '../middleware/auth.js';
 import { StorageService } from './storage.js';
+import { generateIcsCalendar } from './calendar.js';
 
 export class ClientPortalService {
   /**
@@ -890,4 +892,189 @@ export class ClientPortalService {
       expiresIn: 60,
     };
   }
+
+  /**
+   * GET /api/client-portal/interviews
+   * Lists scheduled and historical interviews strictly for the authenticated client's jobs.
+   */
+  static async listScheduledInterviews(
+    user: AuthenticatedUser,
+    query?: { status?: string; jobId?: string; page?: number; limit?: number }
+  ) {
+    const { organizationId, clientId } = this.validateClientScope(user);
+
+    const where: any = {
+      organizationId,
+      clientId,
+    };
+
+    if (query?.status) {
+      where.status = query.status;
+    }
+
+    if (query?.jobId) {
+      where.jobId = query.jobId;
+    }
+
+    const page = query?.page || 1;
+    const limit = query?.limit || 50;
+    const skip = (page - 1) * limit;
+
+    const [interviews, total] = await Promise.all([
+      prisma.interview.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { startAt: 'asc' },
+        include: {
+          candidate: {
+            select: { id: true, name: true, candidateCode: true },
+          },
+          job: {
+            select: { id: true, jobCode: true, title: true },
+          },
+          interviewer: {
+            select: { id: true, fullName: true, firstName: true, lastName: true },
+          },
+        },
+      }),
+      prisma.interview.count({ where }),
+    ]);
+
+    const formatted = interviews.map((i: any) => ({
+      id: i.id,
+      applicationId: i.applicationId,
+      jobId: i.jobId,
+      candidateId: i.candidateId,
+      status: i.status,
+      type: i.type,
+      startAt: i.startAt.toISOString(),
+      endAt: i.endAt.toISOString(),
+      timeZone: i.timeZone,
+      meetingProvider: i.meetingProvider,
+      meetingUrl: i.meetingUrl,
+      location: i.location,
+      feedback: i.feedback,
+      result: i.result,
+      candidate: i.candidate,
+      job: i.job,
+      interviewer: i.interviewer,
+      interviewerNotes: undefined, // Strictly redacted from client view
+      createdAt: i.createdAt.toISOString(),
+    }));
+
+    return { interviews: formatted, total, page, limit };
+  }
+
+  /**
+   * GET /api/client-portal/interviews/:id
+   * Single interview details with strict client scoping and notes redaction.
+   */
+  static async getScheduledInterview(user: AuthenticatedUser, id: string) {
+    const { organizationId, clientId } = this.validateClientScope(user);
+
+    const interview = await prisma.interview.findFirst({
+      where: {
+        id,
+        organizationId,
+        clientId,
+      },
+      include: {
+        candidate: {
+          select: { id: true, name: true, candidateCode: true },
+        },
+        job: {
+          select: { id: true, jobCode: true, title: true },
+        },
+        interviewer: {
+          select: { id: true, fullName: true, firstName: true, lastName: true },
+        },
+      },
+    });
+
+    if (!interview) {
+      const err = new Error('Interview not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    return {
+      id: interview.id,
+      applicationId: interview.applicationId,
+      jobId: interview.jobId,
+      candidateId: interview.candidateId,
+      status: interview.status,
+      type: interview.type,
+      startAt: interview.startAt.toISOString(),
+      endAt: interview.endAt.toISOString(),
+      timeZone: interview.timeZone,
+      meetingProvider: interview.meetingProvider,
+      meetingUrl: interview.meetingUrl,
+      location: interview.location,
+      feedback: interview.feedback,
+      result: interview.result,
+      candidate: interview.candidate,
+      job: interview.job,
+      interviewer: interview.interviewer,
+      interviewerNotes: undefined, // Redacted
+      createdAt: interview.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * Download RFC 5545 iCalendar content for an interview from client portal
+   */
+  static async getScheduledInterviewIcs(user: AuthenticatedUser, id: string): Promise<string> {
+    const { organizationId, clientId } = this.validateClientScope(user);
+
+    const interview = await prisma.interview.findFirst({
+      where: {
+        id,
+        organizationId,
+        clientId,
+      },
+      include: {
+        candidate: {
+          select: { id: true, name: true, candidateCode: true, normalizedEmail: true },
+        },
+        job: {
+          select: { id: true, jobCode: true, title: true },
+        },
+        interviewer: {
+          select: {
+            id: true,
+            fullName: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!interview) {
+      const err = new Error('Interview not found');
+      (err as any).statusCode = 404;
+      (err as any).code = 'NOT_FOUND';
+      throw err;
+    }
+
+    return generateIcsCalendar({
+      interviewId: interview.id,
+      sequence: interview.sequence,
+      summary: `Interview: ${interview.job.title} (${interview.job.jobCode})`,
+      description: `Interview with ${interview.candidate.name}.\nMode: ${interview.type}\nTime Zone: ${interview.timeZone}`,
+      startAt: new Date(interview.startAt),
+      endAt: new Date(interview.endAt),
+      location: interview.location,
+      url: interview.meetingUrl,
+      organizerName: interview.interviewer.fullName || `${interview.interviewer.firstName} ${interview.interviewer.lastName}`,
+      organizerEmail: interview.interviewer.email || 'noreply@hiredeskhr.com',
+      attendeeName: interview.candidate.name,
+      attendeeEmail: interview.candidate.normalizedEmail,
+      isCancellation: interview.status === InterviewStatus.CANCELLED,
+    });
+  }
 }
+

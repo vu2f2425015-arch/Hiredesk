@@ -157,10 +157,36 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ---
 
-### [POST-MVP] Phase 7 — Interviews & Communications
-- [ ] Interview scheduling module with time zones and meeting links.
-- [ ] Email notifications with real SMTP provider integration.
-- [ ] Communication history log.
+### [COMPLETE] Phase 7 — Interview Scheduling, Calendar Events & SMTP Communications Outbox
+- [x] Data Model & Schema:
+  - Created `Interview`, `InterviewHistory`, and `OutboundCommunication` Prisma models with migrations.
+  - Updated relations on `Organization`, `UserProfile`, `Client`, `Job`, `Candidate`, `Application`, and `InterviewRequest` (`interviewId` linkage).
+  - Defined Zod validation schemas and shared DTOs in `@hiredesk/shared`.
+- [x] Interview Scheduling Engine:
+  - Server-side interval collision detection preventing double-booking (`startAt < existingEndAt && endAt > existingStartAt`) with `409 Conflict` (`INTERVIEWER_CONFLICT`).
+  - Atomic conversion of client `InterviewRequest` records into scheduled interviews.
+  - Support for video, phone, in-person, assessment modes with meeting links.
+  - Rescheduling with sequence increments, cancellations with reason tracking, and completion with results.
+- [x] RFC 5545 iCalendar Standards (.ics):
+  - Pure RFC 5545 calendar event generator (`generateIcsCalendar`) with stable UIDs and UTC timestamps.
+  - Sequence tracking (`SEQUENCE: 0` initial, incremented on reschedule).
+  - Method declarations: `REQUEST` for invitations, `CANCEL` for cancellations.
+  - Downloadable `.ics` attachments via authenticated endpoints for recruiters and clients.
+- [x] Durable Communications Outbox & SMTP Transport:
+  - Transactional outbox pattern ensuring emails are recorded atomically with interview operations.
+  - Nodemailer SMTP delivery with TLS/STARTTLS support and transient error backoff retry.
+  - Honest fallback when SMTP variables are omitted (`status: 'failed'`, code `SMTP_NOT_CONFIGURED`).
+  - Manual retry capability for failed outbox entries.
+  - HTML entity escaping preventing script injection in email bodies.
+- [x] Client Portal Scheduled Interviews Tab:
+  - Dedicated `Scheduled Interviews` tab in client portal (`GET /api/client-portal/interviews`).
+  - Read-only view with join meeting links and `.ics` calendar downloads.
+  - Complete confidentiality: internal recruiter notes redacted (`undefined`).
+- [x] Recruiter Interviews View:
+  - Full-featured recruiter UI (`/interviews`) with stats, filters, pending client requests banner, scheduling, rescheduling, completion, and communication history audit drawer.
+- [x] Test Coverage & Build Verification:
+  - 26 new automated unit/integration tests in `tests/interviews.test.ts` and `tests/email.test.ts` (150/150 monorepo tests passing).
+  - 100% clean typecheck (`npm run typecheck`) and production build (`npm run build`).
 
 ---
 

@@ -16,7 +16,17 @@ const ConfigSchema = z.object({
   SUPABASE_JWT_SECRET: z.string().optional(),
   STORAGE_BUCKET_RESUMES: z.string().default('resumes'),
   BOOTSTRAP_SECRET: z.string().default('hiredesk-local-bootstrap-secret'),
+  // SMTP Email Settings
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_SECURE: z.preprocess((val) => val === 'true' || val === true, z.boolean().default(false)),
+  SMTP_USERNAME: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM_NAME: z.string().default('HiredeskHR'),
+  SMTP_FROM_EMAIL: z.string().optional(),
+  APP_PUBLIC_URL: z.string().default('http://localhost:5173'),
 });
+
 
 const parsed = ConfigSchema.safeParse(process.env);
 

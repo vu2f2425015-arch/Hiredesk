@@ -773,3 +773,418 @@ export async function clientSubmitFeedback(
   }
   return json.data;
 }
+
+// ============================================================================
+// Phase 7: Interview Scheduling & Outbox Communication API
+// ============================================================================
+
+export interface ApiInterviewCommunication {
+  id: string;
+  recipientEmail: string;
+  recipientName: string | null;
+  recipientType: string;
+  templateId: string;
+  subject: string;
+  status: 'queued' | 'sending' | 'sent' | 'failed' | string;
+  providerMessageId: string | null;
+  attemptCount: number;
+  lastAttemptAt: string | null;
+  sentAt: string | null;
+  failedAt: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface ApiInterviewHistory {
+  id: string;
+  previousStatus: string;
+  nextStatus: string;
+  startAt: string;
+  endAt: string;
+  timeZone: string;
+  reason: string | null;
+  notes: string | null;
+  createdAt: string;
+  actor?: {
+    id: string;
+    fullName: string | null;
+    firstName: string;
+    lastName: string;
+  } | null;
+}
+
+export interface ApiInterview {
+  id: string;
+  organizationId: string;
+  clientId: string;
+  jobId: string;
+  applicationId: string;
+  candidateId: string;
+  interviewerUserProfileId: string;
+  scheduledByUserProfileId: string | null;
+  type: string;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show' | 'rescheduled' | string;
+  startAt: string;
+  endAt: string;
+  timeZone: string;
+  meetingProvider: string | null;
+  meetingUrl: string | null;
+  location: string | null;
+  sequence: number;
+  interviewerNotes?: string | null;
+  feedback: string | null;
+  result: string | null;
+  cancellationReason: string | null;
+  candidate: {
+    id: string;
+    name: string;
+    normalizedEmail?: string;
+    candidateCode: string;
+  };
+  job: {
+    id: string;
+    jobCode: string;
+    title: string;
+  };
+  client: {
+    id: string;
+    name: string;
+  };
+  interviewer: {
+    id: string;
+    fullName: string | null;
+    firstName: string;
+    lastName: string;
+    email?: string;
+  };
+  scheduledBy?: {
+    id: string;
+    fullName: string | null;
+    firstName: string;
+    lastName: string;
+  } | null;
+  communications?: ApiInterviewCommunication[];
+  histories?: ApiInterviewHistory[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ApiInterviewerOption {
+  id: string;
+  fullName: string | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+}
+
+export interface ApiPendingInterviewRequest {
+  id: string;
+  applicationId: string;
+  jobId: string;
+  clientId: string;
+  status: string;
+  preferredTimes: string[];
+  notes: string | null;
+  createdAt: string;
+  application: {
+    id: string;
+    candidate: {
+      id: string;
+      name: string;
+      normalizedEmail: string;
+      candidateCode: string;
+    };
+  };
+  job: {
+    id: string;
+    jobCode: string;
+    title: string;
+  };
+  client: {
+    id: string;
+    name: string;
+  };
+  requestedBy?: {
+    id: string;
+    fullName: string | null;
+    firstName: string;
+    lastName: string;
+  } | null;
+}
+
+export async function fetchInterviews(
+  token: string,
+  query?: {
+    status?: string;
+    jobId?: string;
+    clientId?: string;
+    candidateId?: string;
+    interviewerId?: string;
+    startDate?: string;
+    endDate?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }
+): Promise<{ interviews: ApiInterview[]; total: number; page: number; limit: number }> {
+  const params = new URLSearchParams();
+  if (query?.status) params.set('status', query.status);
+  if (query?.jobId) params.set('jobId', query.jobId);
+  if (query?.clientId) params.set('clientId', query.clientId);
+  if (query?.candidateId) params.set('candidateId', query.candidateId);
+  if (query?.interviewerId) params.set('interviewerId', query.interviewerId);
+  if (query?.startDate) params.set('startDate', query.startDate);
+  if (query?.endDate) params.set('endDate', query.endDate);
+  if (query?.search) params.set('search', query.search);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+
+  const res = await fetch(`/api/interviews?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch interviews');
+  }
+  return {
+    interviews: json.data,
+    total: json.meta?.total || 0,
+    page: json.meta?.page || 1,
+    limit: json.meta?.limit || 50,
+  };
+}
+
+export async function fetchInterview(token: string, id: string): Promise<ApiInterview> {
+  const res = await fetch(`/api/interviews/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch interview');
+  }
+  return json.data;
+}
+
+export async function scheduleInterview(
+  token: string,
+  payload: {
+    applicationId: string;
+    jobId: string;
+    candidateId: string;
+    clientId: string;
+    interviewerUserProfileId: string;
+    interviewRequestId?: string | null;
+    type: string;
+    startAt: string;
+    endAt: string;
+    timeZone: string;
+    meetingProvider?: string | null;
+    meetingUrl?: string | null;
+    location?: string | null;
+    interviewerNotes?: string | null;
+  }
+): Promise<ApiInterview> {
+  const res = await fetch('/api/interviews', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to schedule interview');
+  }
+  return json.data;
+}
+
+export async function rescheduleInterview(
+  token: string,
+  id: string,
+  payload: {
+    startAt: string;
+    endAt: string;
+    timeZone: string;
+    meetingProvider?: string | null;
+    meetingUrl?: string | null;
+    location?: string | null;
+    reason?: string | null;
+    interviewerNotes?: string | null;
+  }
+): Promise<ApiInterview> {
+  const res = await fetch(`/api/interviews/${id}/reschedule`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to reschedule interview');
+  }
+  return json.data;
+}
+
+export async function cancelInterview(
+  token: string,
+  id: string,
+  reason: string
+): Promise<ApiInterview> {
+  const res = await fetch(`/api/interviews/${id}/cancel`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ reason }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to cancel interview');
+  }
+  return json.data;
+}
+
+export async function completeInterview(
+  token: string,
+  id: string,
+  payload: {
+    feedback?: string | null;
+    result?: string | null;
+    interviewerNotes?: string | null;
+  }
+): Promise<ApiInterview> {
+  const res = await fetch(`/api/interviews/${id}/complete`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to complete interview');
+  }
+  return json.data;
+}
+
+export async function recordNoShow(
+  token: string,
+  id: string,
+  notes?: string
+): Promise<ApiInterview> {
+  const res = await fetch(`/api/interviews/${id}/no-show`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ notes }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to record no-show');
+  }
+  return json.data;
+}
+
+export async function updateInterviewFeedback(
+  token: string,
+  id: string,
+  payload: { feedback: string; result?: string | null }
+): Promise<ApiInterview> {
+  const res = await fetch(`/api/interviews/${id}/feedback`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to update interview feedback');
+  }
+  return json.data;
+}
+
+export async function retryOutboundCommunication(
+  token: string,
+  interviewId: string,
+  commId: string
+): Promise<{ retried: boolean; success: boolean }> {
+  const res = await fetch(`/api/interviews/${interviewId}/communications/${commId}/retry`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to retry email delivery');
+  }
+  return json.data;
+}
+
+export async function fetchInterviewers(token: string): Promise<ApiInterviewerOption[]> {
+  const res = await fetch('/api/interviews/metadata/interviewers', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch interviewers');
+  }
+  return json.data;
+}
+
+export async function fetchPendingInterviewRequests(token: string): Promise<ApiPendingInterviewRequest[]> {
+  const res = await fetch('/api/interviews/metadata/pending-requests', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch pending interview requests');
+  }
+  return json.data;
+}
+
+export async function fetchClientScheduledInterviews(
+  token: string,
+  query?: { status?: string; jobId?: string; page?: number; limit?: number }
+): Promise<{ interviews: ApiInterview[]; total: number; page: number; limit: number }> {
+  const params = new URLSearchParams();
+  if (query?.status) params.set('status', query.status);
+  if (query?.jobId) params.set('jobId', query.jobId);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+
+  const res = await fetch(`/api/client-portal/interviews?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch client scheduled interviews');
+  }
+  return {
+    interviews: json.data,
+    total: json.meta?.total || 0,
+    page: json.meta?.page || 1,
+    limit: json.meta?.limit || 50,
+  };
+}
+
+export async function fetchClientScheduledInterview(token: string, id: string): Promise<ApiInterview> {
+  const res = await fetch(`/api/client-portal/interviews/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch interview details');
+  }
+  return json.data;
+}
+

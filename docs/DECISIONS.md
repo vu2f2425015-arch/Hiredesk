@@ -110,3 +110,34 @@
      - Rejection requires a non-empty reason and transitions to `Rejected`.
      - Both actions atomically write `StageHistory` and `ActivityLog` inside a PostgreSQL `$transaction`.
 - **Consequences**: Complete multi-tenant and cross-client isolation, zero sensitive agency leakage, auditable client review interactions, and truthful communication guarantees.
+
+---
+
+## ADR-011: Pure RFC 5545 .ics Calendar Generation over Uncredentialed OAuth APIs
+- **Status**: Accepted
+- **Context**: Calendar booking systems often attempt or claim direct Google Calendar or Microsoft Outlook OAuth integrations, which in development or uncredentialed environments leads to fake successes, broken mocks, or unverified claims. We need standard calendar invites that work seamlessly across any calendar software (Google Calendar, Outlook, Apple Calendar) without requiring third-party OAuth app verification.
+- **Decision**:
+  1. Implement a pure RFC 5545 iCalendar generator (`calendar.ts`) generating standards-compliant `.ics` content.
+  2. Maintain stable global UIDs (`interview-{id}@hiredeskhr.com`) to allow calendar clients to update or cancel previously scheduled events.
+  3. Track event versioning with `SEQUENCE` integers (0 for initial invite, incremented on each reschedule).
+  4. Use standard iCalendar methods: `METHOD:REQUEST` for invitations and reschedules; `METHOD:CANCEL` with `STATUS:CANCELLED` for cancellations.
+  5. Deliver `.ics` calendar events as standard MIME email attachments and via authenticated direct download endpoints for both recruiters (`/api/interviews/:id/ics`) and clients (`/api/client-portal/interviews/:id/ics`).
+  6. **Honesty Guarantee**: Document that calendar invites are emitted via universal RFC 5545 `.ics` files; never falsely claim direct Google/Microsoft OAuth calendar API sync.
+- **Consequences**: Zero external OAuth dependencies or brittle cloud API keys required for universal calendar compatibility; consistent invite, reschedule, and cancellation semantics across all major email/calendar clients.
+
+---
+
+## ADR-012: Durable Outbound Communication Outbox Pattern vs. Fire-and-Forget SMTP
+- **Status**: Accepted
+- **Context**: Firing SMTP network requests inline within HTTP endpoints risks request timeouts, lost emails if SMTP crashes, ghost bookings if email sends but the database transaction fails, and lack of delivery audit history.
+- **Decision**:
+  1. Implement a durable transactional outbox pattern using the `outbound_communications` table.
+  2. Interview mutations (schedule, reschedule, cancel) atomically persist the interview and queue outbound email records inside a single PostgreSQL `$transaction`.
+  3. `EmailService` processes queued communications using Nodemailer SMTP transport:
+     - Transient network errors (ETIMEDOUT, ECONNRESET, 421/450/451) trigger bounded exponential backoff retries.
+     - Permanent fatal errors (550, 553, invalid address) mark the record as permanently `failed` without infinite loops.
+     - When SMTP environment variables are unconfigured, records are honestly marked `status: 'failed'` with error code `SMTP_NOT_CONFIGURED` without crashing the application.
+  4. Recruiters can view delivery attempts and trigger manual retries via `POST /api/interviews/:id/communications/:commId/retry`.
+  5. Strict XSS prevention: Dynamic parameters in HTML email templates are sanitized with HTML entity escaping (`escapeHtml`).
+- **Consequences**: Guarantees zero lost messages, atomic consistency between interview state and communication logs, transparent delivery tracking, and resilient error recovery.
+

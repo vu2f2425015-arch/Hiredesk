@@ -20,12 +20,16 @@ import {
   Phone,
   ThumbsUp,
   ThumbsDown,
+  Video,
+  ExternalLink,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
   ClientPortalMe,
   ClientPortalJob,
   ClientPortalApplication,
+  ApiInterview,
   fetchClientProfile,
   fetchClientJobs,
   fetchClientJobApplications,
@@ -35,6 +39,7 @@ import {
   clientRejectCandidate,
   clientRequestInterview,
   clientSubmitFeedback,
+  fetchClientScheduledInterviews,
 } from '../lib/api';
 import { ApplicationStage } from '@hiredesk/shared';
 
@@ -72,6 +77,36 @@ export function ClientPortalView() {
   const [actionNotice, setActionNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [downloadingResume, setDownloadingResume] = useState<boolean>(false);
   const [feedbackInput, setFeedbackInput] = useState<string>('');
+
+  // Portal Navigation Tabs & Scheduled Interviews state
+  const [activePortalTab, setActivePortalTab] = useState<'candidates' | 'interviews'>('candidates');
+  const [clientInterviews, setClientInterviews] = useState<ApiInterview[]>([]);
+  const [loadingInterviews, setLoadingInterviews] = useState<boolean>(false);
+  const [interviewStatusFilter, setInterviewStatusFilter] = useState<string>('all');
+  const [interviewJobFilter, setInterviewJobFilter] = useState<string>('');
+  const [selectedInterviewDetail, setSelectedInterviewDetail] = useState<ApiInterview | null>(null);
+
+  const loadClientInterviews = async () => {
+    if (!token) return;
+    setLoadingInterviews(true);
+    try {
+      const res = await fetchClientScheduledInterviews(token, {
+        status: interviewStatusFilter !== 'all' ? interviewStatusFilter : undefined,
+        jobId: interviewJobFilter || undefined,
+      });
+      setClientInterviews(res.interviews);
+    } catch (err: any) {
+      console.error('Failed to load scheduled interviews', err);
+    } finally {
+      setLoadingInterviews(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      loadClientInterviews();
+    }
+  }, [token, activePortalTab, interviewStatusFilter, interviewJobFilter]);
 
   // Load client profile & jobs on mount
   useEffect(() => {
@@ -236,6 +271,24 @@ export function ClientPortalView() {
     }
   };
 
+  const formatInterviewTime = (startStr: string, endStr: string, tz: string) => {
+    try {
+      const s = new Date(startStr);
+      const e = new Date(endStr);
+      const datePart = s.toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      const startPart = s.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      const endPart = e.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      return `${datePart} • ${startPart} – ${endPart} (${tz})`;
+    } catch {
+      return `${startStr} – ${endStr} (${tz})`;
+    }
+  };
+
   // Metrics computation for client overview
   const totalAssignedJobs = jobs.length;
   const totalApplicants = jobs.reduce((acc, j) => acc + j.applicantCount, 0);
@@ -353,287 +406,134 @@ export function ClientPortalView() {
         </div>
       </div>
 
-      {/* Main Jobs & Review Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: selectedJob ? '380px 1fr' : '1fr', gap: '1.5rem' }}>
-        {/* Left Column: Assigned Vacancies List */}
-        <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Briefcase size={18} style={{ color: 'var(--primary)' }} /> Your Vacancies
-            </h3>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{jobs.length} jobs</span>
-          </div>
-
-          {/* Job Search Input */}
-          <div style={{ position: 'relative' }}>
-            <Search
-              size={14}
-              style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }}
-            />
-            <input
-              type="text"
-              placeholder="Search vacancies by title or code..."
-              value={jobSearch}
-              onChange={(e) => setJobSearch(e.target.value)}
+      {/* Portal Section Navigation Tabs */}
+      <div style={{ display: 'flex', gap: '0.75rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
+        <button
+          className={`btn ${activePortalTab === 'candidates' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActivePortalTab('candidates')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <Briefcase size={16} /> Vacancies & Candidate Review ({totalAssignedJobs})
+        </button>
+        <button
+          className={`btn ${activePortalTab === 'interviews' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActivePortalTab('interviews')}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+        >
+          <Calendar size={16} /> Scheduled Interviews
+          {clientInterviews.length > 0 && (
+            <span
               style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem 0.5rem 2.2rem',
-                background: 'var(--bg-input)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: 'var(--radius-sm)',
-                color: '#fff',
-                fontSize: '0.85rem',
+                background: 'rgba(255, 255, 255, 0.2)',
+                padding: '0.1rem 0.45rem',
+                borderRadius: '10px',
+                fontSize: '0.75rem',
               }}
-            />
-          </div>
-
-          {/* Job List */}
-          {loadingJobs ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-              <RefreshCw className="spin" size={20} style={{ margin: '0 auto 0.5rem auto' }} />
-              Loading your vacancies...
-            </div>
-          ) : jobs.length === 0 ? (
-            <div className="empty-state" style={{ padding: '2rem 1rem' }}>
-              <Briefcase size={28} className="empty-icon" />
-              <div className="empty-title" style={{ fontSize: '1rem' }}>No Active Vacancies</div>
-              <p className="empty-desc" style={{ fontSize: '0.8rem', margin: 0 }}>
-                No active jobs currently assigned to your client profile.
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '600px', overflowY: 'auto' }}>
-              {jobs.map((job) => {
-                const isSelected = job.id === selectedJobId;
-                return (
-                  <div
-                    key={job.id}
-                    onClick={() => setSelectedJobId(job.id)}
-                    style={{
-                      padding: '1rem',
-                      background: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255, 255, 255, 0.02)',
-                      border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border-subtle)'}`,
-                      borderRadius: 'var(--radius-md)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                      <span
-                        style={{
-                          fontSize: '0.75rem',
-                          fontFamily: 'monospace',
-                          background: 'rgba(255, 255, 255, 0.06)',
-                          padding: '0.1rem 0.4rem',
-                          borderRadius: '4px',
-                          color: 'var(--accent-cyan)',
-                        }}
-                      >
-                        {job.jobCode}
-                      </span>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                        {job.department || 'General'}
-                      </span>
-                    </div>
-
-                    <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '0.5rem' }}>{job.title}</div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      <span>Applicants: <strong>{job.applicantCount}</strong></span>
-                      {job.reviewCount > 0 && (
-                        <span style={{ color: 'var(--warning)', fontWeight: 600 }}>
-                          &bull; {job.reviewCount} In Review
-                        </span>
-                      )}
-                      {job.shortlistedCount > 0 && (
-                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>
-                          &bull; {job.shortlistedCount} Shortlisted
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            >
+              {clientInterviews.length}
+            </span>
           )}
-        </div>
+        </button>
+      </div>
 
-        {/* Right Column: Applicants for Selected Job */}
-        {selectedJob && (
-          <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                  <span
-                    style={{
-                      fontSize: '0.75rem',
-                      fontFamily: 'monospace',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      padding: '0.15rem 0.5rem',
-                      borderRadius: '4px',
-                      color: 'var(--accent-cyan)',
-                    }}
-                  >
-                    {selectedJob.jobCode}
-                  </span>
-                  <h2 style={{ fontSize: '1.35rem' }}>{selectedJob.title}</h2>
-                </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '1rem' }}>
-                  <span>Model: <strong>{selectedJob.workplaceModel}</strong></span>
-                  <span>Openings: <strong>{selectedJob.openings}</strong></span>
-                  {selectedJob.deadline && (
-                    <span>Deadline: <strong>{new Date(selectedJob.deadline).toLocaleDateString()}</strong></span>
-                  )}
-                </div>
-              </div>
-
-              {/* Stage Filter */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Filter:</span>
-                <select
-                  value={appStageFilter}
-                  onChange={(e) => setAppStageFilter(e.target.value)}
-                  style={{
-                    padding: '0.4rem 0.75rem',
-                    background: 'var(--bg-input)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-sm)',
-                    color: '#fff',
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  <option value="">All Stages</option>
-                  <option value={ApplicationStage.CLIENT_REVIEW}>Client Review ({selectedJob.reviewCount})</option>
-                  <option value={ApplicationStage.SHORTLISTED}>Shortlisted ({selectedJob.shortlistedCount})</option>
-                  <option value={ApplicationStage.APPLIED}>Applied</option>
-                  <option value={ApplicationStage.INTERVIEW}>Interview</option>
-                  <option value={ApplicationStage.REJECTED}>Rejected</option>
-                </select>
-              </div>
+      {activePortalTab === 'candidates' ? (
+        /* Main Jobs & Review Section */
+        <div style={{ display: 'grid', gridTemplateColumns: selectedJob ? '380px 1fr' : '1fr', gap: '1.5rem' }}>
+          {/* Left Column: Assigned Vacancies List */}
+          <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Briefcase size={18} style={{ color: 'var(--primary)' }} /> Your Vacancies
+              </h3>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{jobs.length} jobs</span>
             </div>
 
-            {/* Applications Table / Cards */}
-            {loadingApps ? (
-              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                <RefreshCw className="spin" size={24} style={{ margin: '0 auto 0.5rem auto' }} />
-                Loading candidate applications...
+            {/* Job Search Input */}
+            <div style={{ position: 'relative' }}>
+              <Search
+                size={14}
+                style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }}
+              />
+              <input
+                type="text"
+                placeholder="Search vacancies by title or code..."
+                value={jobSearch}
+                onChange={(e) => setJobSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 0.75rem 0.5rem 2.2rem',
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: '#fff',
+                  fontSize: '0.85rem',
+                }}
+              />
+            </div>
+
+            {/* Job List */}
+            {loadingJobs ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                <RefreshCw className="spin" size={20} style={{ margin: '0 auto 0.5rem auto' }} />
+                Loading your vacancies...
               </div>
-            ) : applications.length === 0 ? (
-              <div className="empty-state" style={{ padding: '3rem 2rem' }}>
-                <Users size={32} className="empty-icon" />
-                <div className="empty-title">No Candidates Found</div>
-                <p className="empty-desc">
-                  No applicants matching the selected stage filter for this vacancy.
+            ) : jobs.length === 0 ? (
+              <div className="empty-state" style={{ padding: '2rem 1rem' }}>
+                <Briefcase size={28} className="empty-icon" />
+                <div className="empty-title" style={{ fontSize: '1rem' }}>No Active Vacancies</div>
+                <p className="empty-desc" style={{ fontSize: '0.8rem', margin: 0 }}>
+                  No active jobs currently assigned to your client profile.
                 </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {applications.map((app) => {
-                  const isUnderReview = app.stage === ApplicationStage.CLIENT_REVIEW;
-                  const isShortlisted = app.stage === ApplicationStage.SHORTLISTED;
-                  const isRejected = app.stage === ApplicationStage.REJECTED;
-
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '600px', overflowY: 'auto' }}>
+                {jobs.map((job) => {
+                  const isSelected = job.id === selectedJobId;
                   return (
                     <div
-                      key={app.id}
+                      key={job.id}
+                      onClick={() => setSelectedJobId(job.id)}
                       style={{
-                        padding: '1.25rem',
-                        background: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid var(--border-subtle)',
+                        padding: '1rem',
+                        background: isSelected ? 'rgba(99, 102, 241, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                        border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border-subtle)'}`,
                         borderRadius: 'var(--radius-md)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        flexWrap: 'wrap',
-                        gap: '1rem',
-                        transition: 'border-color 0.2s ease',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <div
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 'var(--radius-full)',
-                            background: 'rgba(99, 102, 241, 0.1)',
-                            border: '1px solid rgba(99, 102, 241, 0.3)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 700,
-                            color: 'var(--primary)',
-                          }}
-                        >
-                          {app.candidate.name.charAt(0).toUpperCase()}
-                        </div>
-
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem' }}>
-                            <span style={{ fontWeight: 600, fontSize: '1rem' }}>{app.candidate.name}</span>
-                            <span
-                              style={{
-                                fontSize: '0.7rem',
-                                fontFamily: 'monospace',
-                                color: 'var(--text-dim)',
-                                background: 'rgba(255, 255, 255, 0.05)',
-                                padding: '0.1rem 0.35rem',
-                                borderRadius: '3px',
-                              }}
-                            >
-                              {app.candidate.candidateCode}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem' }}>
-                            <span>Applied: {new Date(app.appliedAt).toLocaleDateString()}</span>
-                            {app.candidate.location && <span>&bull; {app.candidate.location}</span>}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        {/* Stage Badge */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
                         <span
                           style={{
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            padding: '0.25rem 0.65rem',
-                            borderRadius: 'var(--radius-full)',
-                            background: isUnderReview
-                              ? 'rgba(245, 158, 11, 0.15)'
-                              : isShortlisted
-                              ? 'rgba(16, 185, 129, 0.15)'
-                              : isRejected
-                              ? 'rgba(239, 68, 68, 0.15)'
-                              : 'rgba(255, 255, 255, 0.08)',
-                            color: isUnderReview
-                              ? 'var(--warning)'
-                              : isShortlisted
-                              ? 'var(--success)'
-                              : isRejected
-                              ? 'var(--danger)'
-                              : 'var(--text-muted)',
-                            border: `1px solid ${
-                              isUnderReview
-                                ? 'rgba(245, 158, 11, 0.3)'
-                                : isShortlisted
-                                ? 'rgba(16, 185, 129, 0.3)'
-                                : isRejected
-                                ? 'rgba(239, 68, 68, 0.3)'
-                                : 'var(--border-subtle)'
-                            }`,
+                            fontSize: '0.75rem',
+                            fontFamily: 'monospace',
+                            background: 'rgba(255, 255, 255, 0.06)',
+                            padding: '0.1rem 0.4rem',
+                            borderRadius: '4px',
+                            color: 'var(--accent-cyan)',
                           }}
                         >
-                          {app.stage}
+                          {job.jobCode}
                         </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                          {job.department || 'General'}
+                        </span>
+                      </div>
 
-                        {/* Review Action Trigger */}
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
-                          onClick={() => setSelectedAppId(app.id)}
-                        >
-                          Review Candidate <ChevronRight size={14} />
-                        </button>
+                      <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '0.5rem' }}>{job.title}</div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <span>Applicants: <strong>{job.applicantCount}</strong></span>
+                        {job.reviewCount > 0 && (
+                          <span style={{ color: 'var(--warning)', fontWeight: 600 }}>
+                            &bull; {job.reviewCount} In Review
+                          </span>
+                        )}
+                        {job.shortlistedCount > 0 && (
+                          <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+                            &bull; {job.shortlistedCount} Shortlisted
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
@@ -641,8 +541,630 @@ export function ClientPortalView() {
               </div>
             )}
           </div>
-        )}
-      </div>
+
+          {/* Right Column: Applicants for Selected Job */}
+          {selectedJob && (
+            <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontFamily: 'monospace',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '4px',
+                        color: 'var(--accent-cyan)',
+                      }}
+                    >
+                      {selectedJob.jobCode}
+                    </span>
+                    <h2 style={{ fontSize: '1.35rem' }}>{selectedJob.title}</h2>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '1rem' }}>
+                    <span>Model: <strong>{selectedJob.workplaceModel}</strong></span>
+                    <span>Openings: <strong>{selectedJob.openings}</strong></span>
+                    {selectedJob.deadline && (
+                      <span>Deadline: <strong>{new Date(selectedJob.deadline).toLocaleDateString()}</strong></span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Stage Filter */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Filter:</span>
+                  <select
+                    value={appStageFilter}
+                    onChange={(e) => setAppStageFilter(e.target.value)}
+                    style={{
+                      padding: '0.4rem 0.75rem',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-sm)',
+                      color: '#fff',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    <option value="">All Stages</option>
+                    <option value={ApplicationStage.CLIENT_REVIEW}>Client Review ({selectedJob.reviewCount})</option>
+                    <option value={ApplicationStage.SHORTLISTED}>Shortlisted ({selectedJob.shortlistedCount})</option>
+                    <option value={ApplicationStage.APPLIED}>Applied</option>
+                    <option value={ApplicationStage.INTERVIEW}>Interview</option>
+                    <option value={ApplicationStage.REJECTED}>Rejected</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Applications Table / Cards */}
+              {loadingApps ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  <RefreshCw className="spin" size={24} style={{ margin: '0 auto 0.5rem auto' }} />
+                  Loading candidate applications...
+                </div>
+              ) : applications.length === 0 ? (
+                <div className="empty-state" style={{ padding: '3rem 2rem' }}>
+                  <Users size={32} className="empty-icon" />
+                  <div className="empty-title">No Candidates Found</div>
+                  <p className="empty-desc">
+                    No applicants matching the selected stage filter for this vacancy.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {applications.map((app) => {
+                    const isUnderReview = app.stage === ApplicationStage.CLIENT_REVIEW;
+                    const isShortlisted = app.stage === ApplicationStage.SHORTLISTED;
+                    const isRejected = app.stage === ApplicationStage.REJECTED;
+
+                    return (
+                      <div
+                        key={app.id}
+                        style={{
+                          padding: '1.25rem',
+                          background: 'rgba(255, 255, 255, 0.02)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 'var(--radius-md)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '1rem',
+                          transition: 'border-color 0.2s ease',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          <div
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 'var(--radius-full)',
+                              background: 'rgba(99, 102, 241, 0.1)',
+                              border: '1px solid rgba(99, 102, 241, 0.3)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                              color: 'var(--primary)',
+                            }}
+                          >
+                            {app.candidate.name.charAt(0).toUpperCase()}
+                          </div>
+
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.15rem' }}>
+                              <span style={{ fontWeight: 600, fontSize: '1rem' }}>{app.candidate.name}</span>
+                              <span
+                                style={{
+                                  fontSize: '0.7rem',
+                                  fontFamily: 'monospace',
+                                  color: 'var(--text-dim)',
+                                  background: 'rgba(255, 255, 255, 0.05)',
+                                  padding: '0.1rem 0.35rem',
+                                  borderRadius: '3px',
+                                }}
+                              >
+                                {app.candidate.candidateCode}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem' }}>
+                              <span>Applied: {new Date(app.appliedAt).toLocaleDateString()}</span>
+                              {app.candidate.location && <span>&bull; {app.candidate.location}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                          {/* Stage Badge */}
+                          <span
+                            style={{
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              padding: '0.25rem 0.65rem',
+                              borderRadius: 'var(--radius-full)',
+                              background: isUnderReview
+                                ? 'rgba(245, 158, 11, 0.15)'
+                                : isShortlisted
+                                ? 'rgba(16, 185, 129, 0.15)'
+                                : isRejected
+                                ? 'rgba(239, 68, 68, 0.15)'
+                                : 'rgba(255, 255, 255, 0.08)',
+                              color: isUnderReview
+                                ? 'var(--warning)'
+                                : isShortlisted
+                                ? 'var(--success)'
+                                : isRejected
+                                ? 'var(--danger)'
+                                : 'var(--text-muted)',
+                              border: `1px solid ${
+                                isUnderReview
+                                  ? 'rgba(245, 158, 11, 0.3)'
+                                  : isShortlisted
+                                  ? 'rgba(16, 185, 129, 0.3)'
+                                  : isRejected
+                                  ? 'rgba(239, 68, 68, 0.3)'
+                                  : 'var(--border-subtle)'
+                              }`,
+                            }}
+                          >
+                            {app.stage}
+                          </span>
+
+                          {/* Review Action Trigger */}
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.45rem 0.9rem', fontSize: '0.85rem' }}
+                            onClick={() => setSelectedAppId(app.id)}
+                          >
+                            Review Candidate <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Scheduled Interviews Section */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          {/* Interview Metrics */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="glass-card" style={{ padding: '1rem' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.25rem' }}>Total Interviews</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#fff' }}>{clientInterviews.length}</div>
+            </div>
+            <div className="glass-card" style={{ padding: '1rem' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.25rem' }}>Scheduled / Upcoming</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
+                {clientInterviews.filter((i) => i.status === 'scheduled').length}
+              </div>
+            </div>
+            <div className="glass-card" style={{ padding: '1rem' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.25rem' }}>Completed</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--success)' }}>
+                {clientInterviews.filter((i) => i.status === 'completed').length}
+              </div>
+            </div>
+            <div className="glass-card" style={{ padding: '1rem' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.25rem' }}>Cancelled / No-Show</div>
+              <div style={{ fontSize: '1.75rem', fontWeight: 700, color: 'var(--danger)' }}>
+                {clientInterviews.filter((i) => i.status === 'cancelled' || i.status === 'no_show').length}
+              </div>
+            </div>
+          </div>
+
+          {/* Filters & Controls */}
+          <div
+            className="glass-card"
+            style={{
+              padding: '1rem 1.25rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Status:</span>
+                <select
+                  value={interviewStatusFilter}
+                  onChange={(e) => setInterviewStatusFilter(e.target.value)}
+                  style={{
+                    padding: '0.4rem 0.75rem',
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="no_show">No Show</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Job:</span>
+                <select
+                  value={interviewJobFilter}
+                  onChange={(e) => setInterviewJobFilter(e.target.value)}
+                  style={{
+                    padding: '0.4rem 0.75rem',
+                    background: 'var(--bg-input)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-sm)',
+                    color: '#fff',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <option value="">All Vacancies</option>
+                  {jobs.map((j) => (
+                    <option key={j.id} value={j.id}>
+                      {j.jobCode} - {j.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button
+              className="btn btn-secondary"
+              onClick={loadClientInterviews}
+              disabled={loadingInterviews}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}
+            >
+              <RefreshCw size={14} className={loadingInterviews ? 'spin' : ''} /> Refresh
+            </button>
+          </div>
+
+          {/* Interviews List */}
+          {loadingInterviews ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+              <RefreshCw className="spin" size={24} style={{ margin: '0 auto 0.5rem auto' }} />
+              Loading scheduled interviews...
+            </div>
+          ) : clientInterviews.length === 0 ? (
+            <div className="empty-state" style={{ padding: '3rem 2rem' }}>
+              <Calendar size={36} className="empty-icon" />
+              <div className="empty-title">No Scheduled Interviews</div>
+              <p className="empty-desc">
+                No interviews match the selected status or vacancy filters. Once your recruiting team schedules an interview, it will appear here with join links and calendar sync options.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {clientInterviews.map((item) => {
+                const isScheduled = item.status === 'scheduled';
+                const isCompleted = item.status === 'completed';
+                const isCancelled = item.status === 'cancelled';
+
+                return (
+                  <div
+                    key={item.id}
+                    className="glass-card"
+                    style={{
+                      padding: '1.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '1rem',
+                      borderLeft: isScheduled
+                        ? '4px solid var(--accent-cyan)'
+                        : isCompleted
+                        ? '4px solid var(--success)'
+                        : isCancelled
+                        ? '4px solid var(--danger)'
+                        : '4px solid var(--border-subtle)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.25rem' }}>
+                      <div
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '0.75rem',
+                          textAlign: 'center',
+                          minWidth: '95px',
+                        }}
+                      >
+                        <Calendar size={18} style={{ color: 'var(--accent-cyan)', marginBottom: '0.25rem' }} />
+                        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-dim)' }}>
+                          {new Date(item.startAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          {new Date(item.startAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{item.candidate.name}</span>
+                          <span
+                            style={{
+                              fontSize: '0.7rem',
+                              fontFamily: 'monospace',
+                              background: 'rgba(255, 255, 255, 0.05)',
+                              padding: '0.1rem 0.4rem',
+                              borderRadius: '3px',
+                              color: 'var(--text-dim)',
+                            }}
+                          >
+                            {item.candidate.candidateCode}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: 'var(--radius-full)',
+                              background: isScheduled
+                                ? 'rgba(6, 182, 212, 0.15)'
+                                : isCompleted
+                                ? 'rgba(16, 185, 129, 0.15)'
+                                : isCancelled
+                                ? 'rgba(239, 68, 68, 0.15)'
+                                : 'rgba(245, 158, 11, 0.15)',
+                              color: isScheduled
+                                ? 'var(--accent-cyan)'
+                                : isCompleted
+                                ? 'var(--success)'
+                                : isCancelled
+                                ? 'var(--danger)'
+                                : 'var(--warning)',
+                            }}
+                          >
+                            {item.status.toUpperCase()}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                          <strong>{item.job.title}</strong> ({item.job.jobCode}) &bull; Interviewer:{' '}
+                          <span>
+                            {item.interviewer.fullName || `${item.interviewer.firstName} ${item.interviewer.lastName}`}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <span style={{ textTransform: 'capitalize' }}>Mode: <strong>{item.type.replace('_', ' ')}</strong></span>
+                          <span>&bull; {formatInterviewTime(item.startAt, item.endAt, item.timeZone)}</span>
+                          {item.location && <span>&bull; Location: {item.location}</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      {item.meetingUrl && !isCancelled && (
+                        <a
+                          href={item.meetingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-primary"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            fontSize: '0.85rem',
+                            padding: '0.45rem 0.9rem',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          <Video size={15} /> Join Meeting <ExternalLink size={12} />
+                        </a>
+                      )}
+
+                      <a
+                        href={`/api/client-portal/interviews/${item.id}/ics`}
+                        download={`interview-${item.id}.ics`}
+                        className="btn btn-secondary"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          fontSize: '0.85rem',
+                          padding: '0.45rem 0.9rem',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        <Download size={15} /> Add to Calendar (.ics)
+                      </a>
+
+                      <button
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}
+                        onClick={() => setSelectedInterviewDetail(item)}
+                      >
+                        <Eye size={15} /> View Details
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Client Interview Detail Modal */}
+      {selectedInterviewDetail && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.5rem',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedInterviewDetail(null);
+          }}
+        >
+          <div
+            className="glass-card"
+            style={{
+              width: '100%',
+              maxWidth: '650px',
+              padding: '2rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <span
+                  style={{
+                    fontSize: '0.75rem',
+                    fontFamily: 'monospace',
+                    color: 'var(--accent-cyan)',
+                    background: 'rgba(6, 182, 212, 0.1)',
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                  }}
+                >
+                  {selectedInterviewDetail.candidate.candidateCode}
+                </span>
+                <h2 style={{ fontSize: '1.4rem', marginTop: '0.25rem' }}>
+                  Interview: {selectedInterviewDetail.candidate.name}
+                </h2>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  For vacancy <strong>{selectedInterviewDetail.job.title}</strong> ({selectedInterviewDetail.job.jobCode})
+                </div>
+              </div>
+
+              <button
+                className="btn btn-secondary"
+                style={{ padding: '0.4rem', borderRadius: 'var(--radius-full)' }}
+                onClick={() => setSelectedInterviewDetail(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Confidentiality Notice */}
+            <div
+              style={{
+                padding: '0.85rem 1rem',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(99, 102, 241, 0.08)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                fontSize: '0.8rem',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <strong>Confidentiality Policy:</strong> Candidate scheduling details are shared for interview coordination. Internal recruiter evaluation notes and scorecard markings remain confidential to your agency team.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem' }}>
+              <div>
+                <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>Scheduled Timing:</span>
+                <div style={{ fontWeight: 600, color: '#fff', marginTop: '0.2rem' }}>
+                  {formatInterviewTime(
+                    selectedInterviewDetail.startAt,
+                    selectedInterviewDetail.endAt,
+                    selectedInterviewDetail.timeZone
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>Status:</span>
+                <div style={{ marginTop: '0.2rem' }}>
+                  <span
+                    className="status-pill status-online"
+                    style={{ textTransform: 'uppercase', fontSize: '0.75rem' }}
+                  >
+                    {selectedInterviewDetail.status}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>Interview Format:</span>
+                <div style={{ fontWeight: 600, color: '#fff', textTransform: 'capitalize', marginTop: '0.2rem' }}>
+                  {selectedInterviewDetail.type.replace('_', ' ')}
+                  {selectedInterviewDetail.meetingProvider ? ` (${selectedInterviewDetail.meetingProvider})` : ''}
+                </div>
+              </div>
+
+              <div>
+                <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>Interviewer:</span>
+                <div style={{ fontWeight: 600, color: '#fff', marginTop: '0.2rem' }}>
+                  {selectedInterviewDetail.interviewer.fullName ||
+                    `${selectedInterviewDetail.interviewer.firstName} ${selectedInterviewDetail.interviewer.lastName}`}
+                </div>
+              </div>
+            </div>
+
+            {selectedInterviewDetail.location && (
+              <div style={{ fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>In-Person Location:</span>
+                <div style={{ color: '#fff', marginTop: '0.2rem' }}>{selectedInterviewDetail.location}</div>
+              </div>
+            )}
+
+            {selectedInterviewDetail.meetingUrl && selectedInterviewDetail.status !== 'cancelled' && (
+              <div
+                style={{
+                  padding: '1rem',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                }}
+              >
+                <div style={{ overflow: 'hidden' }}>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Meeting Join Link:</span>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--accent-cyan)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {selectedInterviewDetail.meetingUrl}
+                  </div>
+                </div>
+
+                <a
+                  href={selectedInterviewDetail.meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                >
+                  <Video size={14} /> Join Now
+                </a>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <a
+                href={`/api/client-portal/interviews/${selectedInterviewDetail.id}/ics`}
+                download={`interview-${selectedInterviewDetail.id}.ics`}
+                className="btn btn-secondary"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}
+              >
+                <Download size={14} /> Download .ics
+              </a>
+              <button className="btn btn-secondary" onClick={() => setSelectedInterviewDetail(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Candidate Review Modal / Drawer */}
       {selectedAppId && (

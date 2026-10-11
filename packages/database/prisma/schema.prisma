@@ -22,6 +22,8 @@ model Organization {
   applications        Application[]
   activityLogs        ActivityLog[]
   interviewRequests   InterviewRequest[]
+  interviews          Interview[]
+  outboundCommunications OutboundCommunication[]
 
   @@map("organizations")
 }
@@ -43,6 +45,9 @@ model UserProfile {
   updatedAt      DateTime      @updatedAt
   stageHistories StageHistory[]
   interviewRequests InterviewRequest[]
+  interviewsAsInterviewer Interview[] @relation("InterviewerProfile")
+  interviewsScheduled     Interview[] @relation("ScheduledByProfile")
+  interviewHistories      InterviewHistory[]
 
   @@index([authUserId])
   @@index([organizationId])
@@ -65,6 +70,7 @@ model Client {
   userProfiles   UserProfile[]
   applications   Application[]
   interviewRequests InterviewRequest[]
+  interviews     Interview[]
 
   @@index([organizationId, name])
   @@map("clients")
@@ -99,6 +105,8 @@ model Job {
   updatedAt             DateTime      @updatedAt
   applications          Application[]
   interviewRequests     InterviewRequest[]
+  interviews            Interview[]
+  outboundCommunications OutboundCommunication[]
 
   @@index([organizationId, status])
   @@index([clientId])
@@ -125,6 +133,8 @@ model Candidate {
   updatedAt       DateTime      @updatedAt
   applications    Application[]
   resumes         Resume[]
+  interviews      Interview[]
+  outboundCommunications OutboundCommunication[]
 
   @@unique([organizationId, normalizedEmail])
   @@index([organizationId])
@@ -153,6 +163,8 @@ model Application {
   resumes        Resume[]
   stageHistories StageHistory[]
   interviewRequests InterviewRequest[]
+  interviews     Interview[]
+  outboundCommunications OutboundCommunication[]
 
   @@unique([jobId, candidateId])
   @@index([organizationId, jobId, stage])
@@ -262,6 +274,8 @@ model InterviewRequest {
   client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
   requestedById  String?
   requestedBy    UserProfile? @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  interviewId    String?
+  interview      Interview?   @relation(fields: [interviewId], references: [id], onDelete: SetNull)
   status         String       @default("pending") // pending, scheduled, completed, cancelled
   preferredTimes Json         @default("[]")
   notes          String?      @db.Text
@@ -272,6 +286,111 @@ model InterviewRequest {
   @@index([jobId])
   @@index([clientId])
   @@index([organizationId])
+  @@index([interviewId])
   @@index([status])
   @@map("interview_requests")
+}
+
+model Interview {
+  id                      String                  @id @default(uuid())
+  organizationId          String
+  organization            Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientId                String
+  client                  Client                  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  jobId                   String
+  job                     Job                     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  applicationId           String
+  application             Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidateId             String
+  candidate               Candidate               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  interviewerUserProfileId String
+  interviewer             UserProfile             @relation("InterviewerProfile", fields: [interviewerUserProfileId], references: [id], onDelete: Restrict)
+  scheduledByUserProfileId String?
+  scheduledBy             UserProfile?            @relation("ScheduledByProfile", fields: [scheduledByUserProfileId], references: [id], onDelete: SetNull)
+  type                    String                  @default("video") // video, phone, onsite, technical, other
+  status                  String                  @default("scheduled") // scheduled, completed, cancelled, no_show, rescheduled
+  startAt                 DateTime
+  endAt                   DateTime
+  timeZone                String                  @default("UTC") // IANA timezone identifier e.g. Asia/Kolkata
+  meetingProvider         String?                 // google_meet, zoom, teams, phone, onsite, other
+  meetingUrl              String?
+  location                String?
+  sequence                Int                     @default(0) // iCal sequence, incremented on reschedule
+  interviewerNotes        String?                 @db.Text
+  feedback                String?                 @db.Text
+  result                  String?                 // passed, failed, pending, strong_hire
+  cancellationReason      String?
+  interviewRequests       InterviewRequest[]
+  histories               InterviewHistory[]
+  communications          OutboundCommunication[]
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+
+  @@index([organizationId, status])
+  @@index([organizationId, startAt])
+  @@index([clientId])
+  @@index([jobId])
+  @@index([applicationId])
+  @@index([candidateId])
+  @@index([interviewerUserProfileId, startAt])
+  @@map("interviews")
+}
+
+model InterviewHistory {
+  id             String       @id @default(uuid())
+  interviewId    String
+  interview      Interview    @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  actorId        String?
+  actor          UserProfile? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  previousStatus String
+  nextStatus     String
+  startAt        DateTime
+  endAt          DateTime
+  timeZone       String
+  reason         String?
+  notes          String?      @db.Text
+  createdAt      DateTime     @default(now())
+
+  @@index([interviewId, createdAt])
+  @@map("interview_histories")
+}
+
+model OutboundCommunication {
+  id                String        @id @default(uuid())
+  organizationId    String
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  candidateId       String?
+  candidate         Candidate?    @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  applicationId     String?
+  application       Application?  @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  jobId             String?
+  job               Job?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  interviewId       String?
+  interview         Interview?    @relation(fields: [interviewId], references: [id], onDelete: SetNull)
+  recipientEmail    String
+  recipientName     String?
+  recipientType     String        // candidate, client, interviewer
+  templateId        String        // interview_invitation, interview_client_notice, interview_rescheduled, interview_cancelled, interview_completed
+  subject           String
+  bodyText          String?       @db.Text
+  bodyHtml          String?       @db.Text
+  status            String        @default("queued") // queued, sending, sent, failed
+  providerMessageId String?
+  attemptCount      Int           @default(0)
+  maxAttempts       Int           @default(5)
+  lastAttemptAt     DateTime?
+  sentAt            DateTime?
+  failedAt          DateTime?
+  errorCode         String?
+  errorMessage      String?
+  idempotencyKey    String        @unique
+  metadata          Json          @default("{}")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([organizationId, status])
+  @@index([interviewId])
+  @@index([recipientEmail])
+  @@index([status, createdAt])
+  @@map("outbound_communications")
 }

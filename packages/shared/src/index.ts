@@ -5,3 +5,5 @@ export * from './schemas/auth.js';
 export * from './schemas/inbound.js';
 export * from './schemas/analytics.js';
 export * from './schemas/clientPortal.js';
+export * from './schemas/interview.js';
+

@@ -108,3 +108,28 @@ graph TD
 | **SEC-28** | Interview Idempotency| Client calls `POST .../request-interview` twice | Second call returns existing pending request without duplicate DB rows | Vitest (`clientPortal.test.ts`) |
 | **SEC-29** | Signed Resume URL | Client calls `GET /api/client-portal/applications/:id/resume` | Issues authorized 60-second signed URL for download | Vitest (`clientPortal.test.ts`) |
 | **SEC-30** | Cross-Client Resume | Client 1 calls `GET .../resume` for application of Client 2 | `404 Not Found` (Zero resume leak) | Vitest (`clientPortal.test.ts`) |
+
+---
+
+## 5. Phase 7 Acceptance Test Matrix: Interview Scheduling, Calendar Events & SMTP Outbox
+
+| Test ID | Module | Scenario / Input | Expected Result | Verified Against |
+| :--- | :--- | :--- | :--- | :--- |
+| **INT-01** | Scheduling | Recruiter schedules valid interview with start < end time | Creates `Interview` in `scheduled` status, queues `OutboundCommunication` records, logs activity | Vitest (`interviews.test.ts`) |
+| **INT-02** | Time Validation | Recruiter supplies `endAt <= startAt` | `400 BAD_REQUEST` with validation error message | Vitest (`interviews.test.ts`) |
+| **INT-03** | Double Booking | Recruiter books interviewer during existing active interview interval | `409 Conflict` (`INTERVIEWER_CONFLICT`), transaction rejected | Vitest (`interviews.test.ts`) |
+| **INT-04** | Client Request Fulfill| Recruiter passes `interviewRequestId` during scheduling | In atomic transaction, creates interview and updates `InterviewRequest` to `scheduled` with `interviewId` linked | Vitest (`interviews.test.ts`) |
+| **INT-05** | Role Authorization | Client role attempts `POST /api/interviews` | `403 Forbidden` (`FORBIDDEN`) — scheduling restricted to recruiter roles | Vitest (`interviews.test.ts`) |
+| **INT-06** | Cross-Tenant Leak | Recruiter in Org A requests interview belonging to Org B | `404 Not Found` (Zero disclosure of other tenant's interview) | Vitest (`interviews.test.ts`) |
+| **INT-07** | Client Scoping | Client calls `GET /api/client-portal/interviews` | Returns only interviews for jobs assigned to caller's `clientId` | Vitest (`interviews.test.ts`) |
+| **INT-08** | Client Notes Redact | Client calls `GET /api/client-portal/interviews/:id` | `interviewerNotes` is redacted (`undefined`) in response | Vitest (`interviews.test.ts`) |
+| **INT-09** | Reschedule Sequence | Recruiter reschedules interview to new time slot | Increments `sequence` (0 -> 1), creates `InterviewHistory`, updates outbox | Vitest (`interviews.test.ts`) |
+| **INT-10** | Reschedule Conflict | Recruiter reschedules interviewer into another existing booking | `409 Conflict` (`INTERVIEWER_CONFLICT`), original time preserved | Vitest (`interviews.test.ts`) |
+| **INT-11** | Cancellation | Recruiter cancels interview with reason | Status set to `cancelled`, creates cancellation outbox email with `METHOD:CANCEL` | Vitest (`interviews.test.ts`) |
+| **INT-12** | .ICS Export | User downloads `/api/interviews/:id/ics` | Emits RFC 5545 calendar with stable UID, sequence, UTC timestamps | Vitest (`interviews.test.ts`) |
+| **INT-13** | XSS Escaping | Email template with `<script>` in candidate name or job title | HTML entities escaped (`&lt;script&gt;`), script execution neutralized | Vitest (`email.test.ts`) |
+| **INT-14** | SMTP Missing | Email service triggered without SMTP configuration | Records `status: 'failed'` with code `SMTP_NOT_CONFIGURED`, does not throw | Vitest (`email.test.ts`) |
+| **INT-15** | Transient Retry | Outbox processor encounters transient socket timeout (ETIMEDOUT) | Increments attempt count and schedules exponential backoff retry | Vitest (`email.test.ts`) |
+| **INT-16** | Permanent Failure | Outbox processor encounters 550 Relay Denied | Marks communication as permanently `failed` without infinite retry loop | Vitest (`email.test.ts`) |
+| **INT-17** | Manual Retry | Recruiter triggers manual retry on failed communication | Re-attempts delivery via outbox and returns result | Vitest (`email.test.ts`) |
+

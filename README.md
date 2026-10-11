@@ -75,12 +75,13 @@ npm run dev:worker  # IMAP Ingestion Worker
 
 ## Phased Development Roadmap
 
-- [x] **Phase 0 — Monorepo Scaffold & Standards** (Active)
-- [ ] **Phase 1 — Supabase Auth, Profiles & Tenant Authorization**
-- [ ] **Phase 2 — Jobs & Atomic Global Job Codes**
-- [ ] **Phase 3 — Candidate, Application & Public Career Portal**
-- [ ] **Phase 4 — Email Ingestion Worker & Unmatched Queue**
-- [ ] **Phase 5 — Recruiter Dashboard, Candidate Profile & Pipeline**
-- [ ] **Phase 6 — Client Portal & Isolation Hardening**
-- [ ] **Phase 7 — Interviews & Communications** (Post-MVP)
+- [x] **Phase 0 — Monorepo Scaffold & Standards**
+- [x] **Phase 1 — Supabase Auth, Profiles & Tenant Authorization**
+- [x] **Phase 2 — Jobs & Atomic Global Job Codes**
+- [x] **Phase 3 — Candidate, Application & Public Career Portal**
+- [x] **Phase 4 — Email Ingestion Worker & Unmatched Queue**
+- [x] **Phase 5 — Recruiter Dashboard, Candidate Profile & Pipeline**
+- [x] **Phase 6 — Client Portal & Isolation Hardening**
+- [x] **Phase 7 — Interviews, Calendar Events & SMTP Communications Outbox**
 - [ ] **Phase 8 — Talent Pool, Analytics & Decision Support** (Post-MVP)
+

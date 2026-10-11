@@ -268,3 +268,85 @@ clientPortalRouter.post(
     }
   }
 );
+
+/**
+ * GET /api/client-portal/interviews
+ * Lists scheduled interviews for client's vacancies.
+ */
+clientPortalRouter.get(
+  '/client-portal/interviews',
+  authenticate,
+  requireRole(UserRole.CLIENT),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { status, jobId, page, limit } = req.query as any;
+      const result = await ClientPortalService.listScheduledInterviews(req.user!, {
+        status: status ? String(status) : undefined,
+        jobId: jobId ? String(jobId) : undefined,
+        page: page ? parseInt(String(page), 10) : 1,
+        limit: limit ? parseInt(String(limit), 10) : 50,
+      });
+      sendSuccess(res, result.interviews, 200, {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+      });
+    } catch (err: any) {
+      if (err.statusCode) {
+        sendError(res, err.code || 'BAD_REQUEST', err.message, err.statusCode);
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/client-portal/interviews/:id
+ * Gets interview details for client's candidate with notes redacted.
+ */
+clientPortalRouter.get(
+  '/client-portal/interviews/:id',
+  authenticate,
+  requireRole(UserRole.CLIENT),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const interview = await ClientPortalService.getScheduledInterview(req.user!, id);
+      sendSuccess(res, interview);
+    } catch (err: any) {
+      if (err.statusCode) {
+        sendError(res, err.code || 'BAD_REQUEST', err.message, err.statusCode);
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+/**
+ * GET /api/client-portal/interviews/:id/ics
+ * Download RFC 5545 .ics iCalendar file for client
+ */
+clientPortalRouter.get(
+  '/client-portal/interviews/:id/ics',
+  authenticate,
+  requireRole(UserRole.CLIENT),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const ics = await ClientPortalService.getScheduledInterviewIcs(req.user!, id);
+      res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="interview-${id}.ics"`);
+      res.send(ics);
+    } catch (err: any) {
+      if (err.statusCode) {
+        sendError(res, err.code || 'BAD_REQUEST', err.message, err.statusCode);
+        return;
+      }
+      next(err);
+    }
+  }
+);
+
+

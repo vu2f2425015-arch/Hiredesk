@@ -126,21 +126,39 @@ sequenceDiagram
   - Recent activity feed
 - Absolutely zero hardcoded or simulated mock metrics.
 
+### 4.8 Interview Scheduling & Communications Outbox (Phase 7)
+- **Direct Recruiter Scheduling**: Full multi-entity linkage across Organization, Client, Job, Candidate, Application, and Interviewer.
+- **Conversion of Client Requests**: Authorized recruiters fulfill pending `InterviewRequest` records into confirmed interviews in an atomic transaction.
+- **Server-Side Double-Booking Conflict Prevention**: Rejects any overlapping bookings for the same interviewer with `409 INTERVIEWER_CONFLICT` using interval intersection check (`startAt < existingEndAt && endAt > existingStartAt`).
+- **RFC 5545 iCalendar Standards (.ics)**: Pure, standards-compliant `.ics` generation with stable UID (`interview-{id}@hiredeskhr.com`), UTC timestamps, sequence counter increments on reschedule, and `METHOD:REQUEST` / `METHOD:CANCEL`. *Guaranteed honesty: Emits standard .ics calendar files compatible with Google/Apple/Outlook calendars; never falsely claims direct Google/Microsoft OAuth API sync without credentials.*
+- **Durable Outbox Pattern (`OutboundCommunication`)**:
+  - Outbound emails (invitations, client notices, reschedules, cancellations) are queued transactionally.
+  - Nodemailer SMTP delivery with bounded exponential backoff retries.
+  - Honest fallback when SMTP variables are omitted (`SMTP_NOT_CONFIGURED` failure status recorded).
+  - Manual retry capability for failed outbox entries.
+  - Complete XSS prevention via HTML entity escaping for candidate names, jobs, and recruiter notes.
+- **Client Portal Isolation**:
+  - Client users can view scheduled interviews for their vacancies (`GET /api/client-portal/interviews`).
+  - Read-only access: Clients cannot reschedule or cancel internal interviews.
+  - Zero leakage guarantee: Internal recruiter preparation notes are redacted (`undefined`).
+  - Meeting join URLs and authenticated `.ics` calendar downloads provided.
+
 ---
 
 ## 5. Scope Boundaries
 
-### MVP Scope (Phases 0 - 6)
+### MVP & Core Features (Phases 0 - 7 Complete)
 - Monorepo scaffold, CI scripts, health checks.
 - Supabase Auth, User Profiles, multi-tenant RBAC.
 - Jobs CRUD & atomic PostgreSQL Job Code generator.
 - Public job views and public application submission.
 - Node IMAP ingestion worker with idempotent parsing & unmatched queue.
 - Recruiter pipeline, candidate detail, and stage transitions.
-- Client portal with strict client-level authorization and isolation tests.
+- Dedicated client portal with strict tenant isolation and interview request workflows.
+- Multi-party interview scheduling, double-booking prevention, RFC 5545 .ics generation, durable SMTP outbox, and audit histories.
 
-### Post-MVP Scope (Phases 7 - 8)
-- Automated interview calendar booking & real SMTP notifications.
-- Talent pool global search across agency candidate archive.
+### Next Scope (Phase 8+)
+- Talent pool global archive search across agency candidate database.
 - Transparent AI resume-to-job matching (explainable criteria only).
 - Billing, subscription tiers, and multi-mailbox support.
+

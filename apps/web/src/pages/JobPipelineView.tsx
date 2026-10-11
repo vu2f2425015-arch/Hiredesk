@@ -311,6 +311,7 @@ export function JobPipelineView({ jobId, onClose }: JobPipelineViewProps) {
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
+                              justifyContent: 'space-between',
                               gap: '0.35rem',
                               padding: '0.25rem 0.5rem',
                               borderRadius: '4px',
@@ -321,8 +322,24 @@ export function JobPipelineView({ jobId, onClose }: JobPipelineViewProps) {
                               fontWeight: 600,
                             }}
                           >
-                            <Calendar size={12} />
-                            <span>Interview Requested</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Calendar size={12} />
+                              <span>Interview Requested</span>
+                            </span>
+                            {!isClient && (
+                              <a
+                                href="/interviews"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  color: '#f59e0b',
+                                  textDecoration: 'underline',
+                                  marginLeft: '0.25rem',
+                                  fontSize: '0.7rem',
+                                }}
+                              >
+                                Fulfill &rarr;
+                              </a>
+                            )}
                           </div>
                         )}
 

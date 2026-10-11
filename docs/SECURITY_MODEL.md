@@ -175,4 +175,30 @@ Client responses are generated through specialized transformations that:
 
 ### 8.4 Persisted Interview Requests Truthfulness
 - Submitting an interview request via `POST /api/client-portal/applications/:id/request-interview` records an auditable `InterviewRequest` entity with `status: 'pending'`.
-- System contracts prohibit claiming that an interview was scheduled or an invitation sent until Phase 7 calendar integrations exist.
+- System contracts prohibit claiming that an interview was scheduled or an invitation sent until verified recruitment coordination. When scheduled by an authorized recruiter in Phase 7, the record is linked (`interviewId`) and updated to `status: 'scheduled'`.
+
+---
+
+## 9. Interview Scheduling Security & Anti-Conflict Guarantees (Phase 7)
+
+### 9.1 Tenant & Scope Isolation on Interviews
+- All interview CRUD operations (`/api/interviews/*`) enforce strict tenant scoping (`organizationId: req.user.organizationId`).
+- Recruiter roles (`super_admin`, `manager`, `recruiter`) are strictly required for scheduling, rescheduling, cancelling, and completing interviews.
+- Cross-tenant requests unconditionally yield non-disclosing `404 Not Found` responses.
+
+### 9.2 Server-Side Double-Booking Conflict Prevention
+- Scheduling or rescheduling an interview performs an atomic interval overlap query on the assigned interviewer:
+  `startAt < newEndAt AND endAt > newStartAt` for all non-cancelled, non-no-show interviews.
+- Any overlap triggers an immediate rejection with `409 Conflict` (`INTERVIEWER_CONFLICT`) before any changes or outbound communications are persisted.
+
+### 9.3 Client Portal Confidentiality & Zero Leakage
+- Client users can view scheduled interviews for their vacancies via `GET /api/client-portal/interviews`.
+- `interviewerNotes` are strictly redacted (`undefined`) at the service query layer.
+- Clients have read-only access: mutation routes (`/api/interviews/:id/reschedule`, `/complete`, etc.) reject client callers with `403 Forbidden`.
+
+### 9.4 Outbound Email XSS Prevention & Honest Delivery
+- All dynamic data interpolated into HTML email templates (candidate names, job titles, notes) is escaped via `escapeHtml` to neutralize script injection or HTML breakage.
+- Outbound communications are stored in a durable transactional outbox (`OutboundCommunication`).
+- If SMTP credentials are missing, system records `status: 'failed'` with code `SMTP_NOT_CONFIGURED` without masking failure or claiming delivery.
+- Standards-compliant RFC 5545 `.ics` iCalendar attachments use sanitized fields and stable UIDs without claiming direct Google/Microsoft OAuth integration.
+

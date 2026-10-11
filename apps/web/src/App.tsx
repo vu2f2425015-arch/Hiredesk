@@ -9,6 +9,7 @@ import {
   LogIn,
   LogOut,
   User as UserIcon,
+  Calendar,
 } from 'lucide-react';
 import { UserRole } from '@hiredesk/shared';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -18,6 +19,8 @@ import { DashboardView } from './pages/DashboardView';
 import { PublicCareerView } from './pages/PublicCareerView';
 import { UnmatchedApplicationsView } from './pages/UnmatchedApplicationsView';
 import { ClientPortalView } from './pages/ClientPortalView';
+import { InterviewsView } from './pages/InterviewsView';
+
 
 interface HealthResponse {
   status: string;
@@ -95,6 +98,9 @@ function AppShell() {
               <NavLink to="/jobs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <Briefcase size={16} /> Jobs
               </NavLink>
+              <NavLink to="/interviews" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Calendar size={16} /> Interviews
+              </NavLink>
               <NavLink to="/unmatched" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <Inbox size={16} /> Unmatched
               </NavLink>
@@ -171,6 +177,10 @@ function AppShell() {
           <Route path="/client-portal" element={<ClientPortalView />} />
           <Route path="/login" element={<AuthView />} />
           <Route path="/jobs" element={isClient ? <Navigate to="/client-portal" replace /> : <JobsView />} />
+          <Route
+            path="/interviews"
+            element={isClient ? <Navigate to="/client-portal" replace /> : <InterviewsView />}
+          />
           <Route path="/career/:orgSlug" element={<PublicCareerView />} />
           <Route path="/career/:orgSlug/:jobCode" element={<PublicCareerView />} />
           <Route
@@ -180,6 +190,7 @@ function AppShell() {
           <Route path="/system-status" element={<SystemStatusView health={health} loading={loading} error={error} />} />
         </Routes>
       </main>
+
 
       <footer className="footer">
         <p>

@@ -225,16 +225,84 @@ System-wide audit trail.
 
 ### 3.11 InterviewRequest
 Persisted interview request record submitted by an authenticated client user for an application.
-*Note: Records an auditable client interview request. It strictly records a pending request and does NOT represent a scheduled calendar event or sent invitation.*
 - `id`: UUID (Primary Key, default `gen_random_uuid()`)
 - `applicationId`: UUID NOT NULL (FK -> `Application.id`, onDelete Cascade)
 - `jobId`: UUID NOT NULL (FK -> `Job.id`, onDelete Cascade)
 - `organizationId`: UUID NOT NULL (FK -> `Organization.id`, onDelete Cascade)
 - `clientId`: UUID NOT NULL (FK -> `Client.id`, onDelete Cascade)
 - `requestedById`: UUID NULL (FK -> `UserProfile.id`, onDelete SetNull)
+- `interviewId`: UUID NULL (FK -> `Interview.id`, onDelete SetNull) - Set when fulfilled into a scheduled interview
 - `status`: VarChar(50) DEFAULT 'pending' (`pending`, `scheduled`, `completed`, `cancelled`)
 - `preferredTimes`: JSONB DEFAULT '[]' (Array of proposed time slots)
 - `notes`: Text NULL (Specific context or notes from client)
 - `createdAt`: Timestamp with time zone DEFAULT now()
 - `updatedAt`: Timestamp with time zone DEFAULT now()
 - **Indexes**: `(applicationId)`, `(organizationId, clientId)`, `(jobId)`, `(status)`, `(createdAt)`
+
+### 3.12 Interview (Phase 7)
+Scheduled interview booking linking all hiring stakeholders.
+- `id`: UUID (Primary Key, default `gen_random_uuid()`)
+- `organizationId`: UUID NOT NULL (FK -> `Organization.id`, onDelete Cascade)
+- `clientId`: UUID NOT NULL (FK -> `Client.id`, onDelete Cascade)
+- `jobId`: UUID NOT NULL (FK -> `Job.id`, onDelete Cascade)
+- `applicationId`: UUID NOT NULL (FK -> `Application.id`, onDelete Cascade)
+- `candidateId`: UUID NOT NULL (FK -> `Candidate.id`, onDelete Cascade)
+- `interviewerUserProfileId`: UUID NOT NULL (FK -> `UserProfile.id`, onDelete Restrict)
+- `scheduledByUserProfileId`: UUID NULL (FK -> `UserProfile.id`, onDelete SetNull)
+- `type`: VarChar(50) DEFAULT 'video' (`video`, `phone`, `in_person`, `technical_assessment`, `culture_fit`)
+- `status`: VarChar(50) DEFAULT 'scheduled' (`scheduled`, `completed`, `cancelled`, `no_show`, `rescheduled`)
+- `startAt`: Timestamp with time zone NOT NULL
+- `endAt`: Timestamp with time zone NOT NULL
+- `timeZone`: VarChar(50) DEFAULT 'UTC'
+- `meetingProvider`: VarChar(50) NULL (`google_meet`, `microsoft_teams`, `zoom`, `phone`, `custom`)
+- `meetingUrl`: VarChar(500) NULL
+- `location`: VarChar(500) NULL
+- `sequence`: Int DEFAULT 0 (Incremented on each reschedule for RFC 5545 calendar sequence compliance)
+- `interviewerNotes`: Text NULL (Confidential internal preparation & evaluation notes; strictly redacted from client portal)
+- `feedback`: Text NULL (Feedback summary)
+- `result`: VarChar(50) NULL (`passed`, `failed`, `on_hold`)
+- `cancellationReason`: Text NULL
+- `createdAt`: Timestamp with time zone DEFAULT now()
+- `updatedAt`: Timestamp with time zone DEFAULT now()
+- **Indexes**: `(organizationId, interviewerUserProfileId, startAt, endAt)`, `(organizationId, clientId, startAt)`, `(applicationId)`, `(status)`
+
+### 3.13 InterviewHistory (Phase 7)
+Append-only lifecycle and reschedule audit history for interviews.
+- `id`: UUID (Primary Key, default `gen_random_uuid()`)
+- `interviewId`: UUID NOT NULL (FK -> `Interview.id`, onDelete Cascade)
+- `actorUserProfileId`: UUID NULL (FK -> `UserProfile.id`, onDelete SetNull)
+- `previousStatus`: VarChar(50) NOT NULL
+- `nextStatus`: VarChar(50) NOT NULL
+- `startAt`: Timestamp with time zone NOT NULL
+- `endAt`: Timestamp with time zone NOT NULL
+- `timeZone`: VarChar(50) NOT NULL
+- `reason`: Text NULL
+- `notes`: Text NULL
+- `createdAt`: Timestamp with time zone DEFAULT now()
+- **Indexes**: `(interviewId, createdAt)`
+
+### 3.14 OutboundCommunication (Phase 7)
+Durable outbound email outbox for interview invitations, calendar events, updates, and cancellations.
+- `id`: UUID (Primary Key, default `gen_random_uuid()`)
+- `organizationId`: UUID NOT NULL (FK -> `Organization.id`, onDelete Cascade)
+- `interviewId`: UUID NULL (FK -> `Interview.id`, onDelete SetNull)
+- `recipientEmail`: VarChar(255) NOT NULL
+- `recipientName`: VarChar(255) NULL
+- `recipientType`: VarChar(50) NOT NULL (`candidate`, `interviewer`, `client`, `recruiter`)
+- `templateId`: VarChar(100) NOT NULL (`interview_invitation_candidate`, `interview_notice_client`, `interview_rescheduled_candidate`, `interview_rescheduled_client`, `interview_cancelled_candidate`, `interview_cancelled_client`)
+- `subject`: VarChar(255) NOT NULL
+- `bodyHtml`: Text NOT NULL
+- `bodyText`: Text NOT NULL
+- `status`: VarChar(50) DEFAULT 'queued' (`queued`, `sending`, `sent`, `failed`)
+- `providerMessageId`: VarChar(255) NULL
+- `attemptCount`: Int DEFAULT 0
+- `lastAttemptAt`: Timestamp with time zone NULL
+- `sentAt`: Timestamp with time zone NULL
+- `failedAt`: Timestamp with time zone NULL
+- `errorCode`: VarChar(100) NULL
+- `errorMessage`: Text NULL
+- `metadata`: JSONB DEFAULT '{}'
+- `createdAt`: Timestamp with time zone DEFAULT now()
+- `updatedAt`: Timestamp with time zone DEFAULT now()
+- **Indexes**: `(organizationId, status)`, `(interviewId)`, `(recipientEmail)`, `(createdAt)`
+
