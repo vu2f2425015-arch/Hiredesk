@@ -10,6 +10,7 @@ import {
   AlertCircle,
   RefreshCw,
   Send,
+  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -381,6 +382,34 @@ export function CandidateProfileModal({
                       </button>
                     </div>
                   </div>
+
+                  {/* Pending Client Interview Request Indicator */}
+                  {(activeApplication as any).interviewRequests && (activeApplication as any).interviewRequests.length > 0 && (
+                    <div
+                      style={{
+                        padding: '0.85rem 1rem',
+                        background: 'rgba(6, 182, 212, 0.12)',
+                        border: '1px solid rgba(6, 182, 212, 0.3)',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.4rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-cyan)', fontWeight: 600, fontSize: '0.85rem' }}>
+                        <Calendar size={16} /> Pending Client Interview Request
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Client requested an interview on {new Date((activeApplication as any).interviewRequests[0].createdAt).toLocaleDateString()}.
+                        {(activeApplication as any).interviewRequests[0].preferredTimes?.length > 0 && (
+                          <span> Preferred times: <strong>{(activeApplication as any).interviewRequests[0].preferredTimes.join(', ')}</strong></span>
+                        )}
+                        {(activeApplication as any).interviewRequests[0].notes && (
+                          <span> &bull; Notes: "{(activeApplication as any).interviewRequests[0].notes}"</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Stage Transition Control */}
                   <div

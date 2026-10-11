@@ -3,6 +3,7 @@ import {
   RefreshCw,
   Download,
   AlertCircle,
+  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -304,6 +305,26 @@ export function JobPipelineView({ jobId, onClose }: JobPipelineViewProps) {
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                           {app.candidate.normalizedEmail}
                         </div>
+
+                        {app.hasPendingInterviewRequest && (
+                          <div
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '4px',
+                              background: 'rgba(245, 158, 11, 0.12)',
+                              border: '1px solid rgba(245, 158, 11, 0.35)',
+                              color: '#fbbf24',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                            }}
+                          >
+                            <Calendar size={12} />
+                            <span>Interview Requested</span>
+                          </div>
+                        )}
 
                         {app.candidate.skills && app.candidate.skills.length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>

@@ -151,3 +151,28 @@ For tables accessed via direct Supabase client connections or public extensions:
    - Stage transitions write `Application.stage`, `StageHistory`, and `ActivityLog` in a single PostgreSQL `$transaction`.
    - If any step fails, the entire transaction rolls back, preventing orphaned history or stale state.
 
+---
+
+## 8. Client Portal Hardening & Safe DTO Architecture
+
+### 8.1 Dedicated Route Isolation & Scope Validation
+All client portal operations are strictly isolated under `/api/client-portal/*`. Every endpoint enforces `validateClientScope(req.user)`:
+1. `req.user.role === 'client'`.
+2. `req.user.organizationId` and `req.user.clientId` are both present and valid.
+3. Callers with `recruiter`, `manager`, or `super_admin` are blocked from client portal endpoints with `403 Forbidden` (`FORBIDDEN`).
+
+### 8.2 Non-Disclosing 404 Responses
+To eliminate ID enumeration and cross-tenant resource existence disclosure:
+- If a client requests a job, application, or resume belonging to a different client or tenant, the API unconditionally responds with `404 Not Found` (`NOT_FOUND`), identical to a non-existent UUID.
+- No `403 Forbidden` or revealing error messages are returned for cross-client queries.
+
+### 8.3 Safe Client DTO Protections
+Client responses are generated through specialized transformations that:
+1. Redact `recruiterNotes` entirely (`undefined`).
+2. Redact internal `storagePath`, `bucket`, `checksum`, and `parsingError` from resumes.
+3. Redact raw email ingestion payloads (`rawPayload`) and mail headers.
+4. Redact internal activity logs (`visibility: 'internal'`).
+
+### 8.4 Persisted Interview Requests Truthfulness
+- Submitting an interview request via `POST /api/client-portal/applications/:id/request-interview` records an auditable `InterviewRequest` entity with `status: 'pending'`.
+- System contracts prohibit claiming that an interview was scheduled or an invitation sent until Phase 7 calendar integrations exist.

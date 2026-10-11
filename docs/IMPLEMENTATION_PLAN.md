@@ -128,12 +128,32 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ---
 
-### [PENDING] Phase 6 — Client Portal & Isolation Hardening
-- [ ] Client user dashboard restricted to assigned `clientId`.
-- [ ] Client review actions: Shortlist, Reject, Request Interview, Leave Feedback.
-- [ ] Authorization enforcement preventing access to recruiter-only notes.
-- [ ] Negative security tests: attempt cross-client and cross-org access via ID manipulation.
-- [ ] End-to-end critical acceptance test run.
+### [COMPLETED] Phase 6 — Dedicated Client Portal, Client Review Actions & Tenant Isolation Hardening
+- [x] Dedicated Client Portal API and routes in `apps/api/src/routes/clientPortal.ts` mounted at `/api/client-portal/*`.
+- [x] Client role authorization enforcement (`validateClientScope`) strictly locking client access to authenticated `organizationId` and `clientId`.
+- [x] Safe Client DTO architecture:
+  - Redacts `recruiterNotes` (`undefined`).
+  - Redacts private `storagePath`, `bucket`, `checksum`, and `parsingError` on resumes.
+  - Strips raw email payloads, internal activity logs, and cross-client telemetry.
+- [x] Non-disclosing 404 Not Found for any cross-tenant, cross-client, or non-existent entity access attempts.
+- [x] Persisted `InterviewRequest` entity in PostgreSQL (`packages/database/prisma/schema.prisma` and versioned migration `20261011000004_interview_requests`):
+  - Correctly records auditable client interview requests with `status: 'pending'`.
+  - Honest distinction: Does NOT simulate or pretend a calendar invite or scheduled meeting was sent. Returns explicit notice: *"Interview request submitted. Your recruiter will coordinate scheduling."*
+- [x] Client review action endpoints:
+  - `POST /api/client-portal/applications/:id/shortlist`: Idempotent transition from `Client Review` to `Shortlisted` with atomic `StageHistory` and `ActivityLog`.
+  - `POST /api/client-portal/applications/:id/reject`: Requires validated reason, transitions to `Rejected` with atomic audit logging.
+  - `POST /api/client-portal/applications/:id/request-interview`: Idempotent pending request creation.
+  - `POST /api/client-portal/applications/:id/feedback`: Adds `clientFeedback` without modifying or leaking `recruiterNotes`.
+  - `GET /api/client-portal/applications/:id/resume`: Issues authorized, short-lived 60-second signed URL for client resume preview.
+- [x] Frontend Client Portal in `apps/web/src/pages/ClientPortalView.tsx`:
+  - Client company banner, live KPIs (assigned jobs, total applicants, review queue, shortlisted).
+  - Searchable jobs directory with applicant counts.
+  - Applicant list filtered by pipeline stage.
+  - Modal candidate review drawer with resume download, feedback history, and pending interview request status.
+  - Recruiter view integration in `JobPipelineView.tsx` and `CandidateProfileModal.tsx` showing pending interview request alerts.
+- [x] Comprehensive test coverage:
+  - 18 mock unit/security tests in `apps/api/tests/clientPortal.test.ts` (124 total repo tests passing).
+  - 8 live Supabase integration tests passing in `test_phase6_e2e.mjs`.
 
 ---
 

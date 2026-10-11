@@ -381,6 +381,10 @@ export class ApplicationService {
           select: { id: true, jobCode: true, title: true, organizationId: true, clientId: true },
         },
         resumes: true,
+        interviewRequests: {
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, status: true, preferredTimes: true, notes: true, createdAt: true },
+        },
         stageHistories: {
           orderBy: { timestamp: 'asc' },
           include: {
@@ -415,10 +419,19 @@ export class ApplicationService {
       throw err;
     }
 
-    // Hard separation: client role must NEVER see internal recruiterNotes
+    // Hard separation: client role must NEVER see internal recruiterNotes or raw resume storage paths
     if (user.role === UserRole.CLIENT) {
       const { recruiterNotes: _rn, ...safeApp } = app;
-      return safeApp;
+      return {
+        ...safeApp,
+        resumes: (safeApp.resumes || []).map((r: any) => ({
+          id: r.id,
+          originalFilename: r.originalFilename,
+          fileSize: r.fileSize,
+          contentType: r.contentType,
+          uploadedAt: r.uploadedAt instanceof Date ? r.uploadedAt.toISOString() : r.uploadedAt,
+        })),
+      };
     }
 
     return app;
@@ -679,6 +692,10 @@ export class ApplicationService {
           take: 1,
           select: { timestamp: true, reason: true },
         },
+        interviewRequests: {
+          where: { status: 'pending' },
+          select: { id: true, status: true, preferredTimes: true, notes: true, createdAt: true },
+        },
       },
     });
 
@@ -697,6 +714,7 @@ export class ApplicationService {
     };
 
     for (const app of applications) {
+      const interviewReqs = (app as any).interviewRequests || [];
       const safeApp = {
         id: app.id,
         candidateId: app.candidateId,
@@ -717,6 +735,14 @@ export class ApplicationService {
               reason: app.stageHistories[0].reason,
             }
           : null,
+        interviewRequests: interviewReqs.map((ir: any) => ({
+          id: ir.id,
+          status: ir.status,
+          preferredTimes: ir.preferredTimes,
+          notes: ir.notes,
+          createdAt: ir.createdAt instanceof Date ? ir.createdAt.toISOString() : ir.createdAt,
+        })),
+        hasPendingInterviewRequest: interviewReqs.length > 0,
       };
 
       if (stages[app.stage]) {
@@ -840,7 +866,13 @@ export class ApplicationService {
       createdAt: candidate.createdAt.toISOString(),
       updatedAt: candidate.updatedAt.toISOString(),
       applications: filteredApplications,
-      resumes: candidate.resumes,
+      resumes: candidate.resumes.map((r: any) => ({
+        id: r.id,
+        originalFilename: r.originalFilename,
+        fileSize: r.fileSize,
+        contentType: r.contentType,
+        uploadedAt: r.uploadedAt instanceof Date ? r.uploadedAt.toISOString() : r.uploadedAt,
+      })),
     };
   }
 

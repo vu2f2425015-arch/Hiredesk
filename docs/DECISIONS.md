@@ -89,3 +89,24 @@
      - Zero fake/sample data: an empty organization returns honest zeros (`0`, `[]`).
 - **Consequences**: Absolute confidentiality of agency notes, guaranteed referential and transactional integrity of hiring histories, and reliable real-time metrics.
 
+---
+
+## ADR-010: Dedicated Client Portal, Safe DTOs, Non-Disclosing 404s & Persisted Interview Requests
+- **Status**: Accepted
+- **Context**: External client hiring managers need a dedicated, focused portal to view their assigned vacancies, review applicants submitted for client review, shortlist or reject candidates, and request interviews without exposing recruiter notes, private resume storage paths, internal logs, or other clients' jobs. Crucially, requesting an interview must never be falsely reported as a scheduled meeting or sent calendar invitation before calendar/SMTP infrastructure exists.
+- **Decision**:
+  1. **Dedicated Client Portal Routes & Service**: Mounted under `/api/client-portal/*`. Every method validates the caller has `role = 'client'` and non-null `organizationId` and `clientId`.
+  2. **Safe DTO Architecture**:
+     - Strips `recruiterNotes` entirely (`undefined`).
+     - Strips private resume `storagePath`, `bucket`, `checksum`, and `parsingError`. Only safe file metadata is provided; file downloads require calling the authorized 60-second signed URL generator.
+     - Strips internal system activity logs and raw email payloads.
+  3. **Non-Disclosing 404 Not Found**: Any attempt by a client to access jobs, applications, or resumes outside their authorized `organizationId` and `clientId` returns a generic `404 Not Found` rather than `403 Forbidden` to prevent ID enumeration and resource existence disclosure.
+  4. **Persisted InterviewRequest Entity**:
+     - Creates an auditable record in the `interview_requests` table with `status = 'pending'`, capturing preferred times and notes.
+     - Explicit honesty guarantee: Returns message *"Interview request submitted. Your recruiter will coordinate scheduling."* Never claims an invitation was sent or meeting was scheduled.
+     - Idempotent: Subsequent requests return the existing pending request without creating duplicate records.
+  5. **Atomic Review Actions**:
+     - Shortlisting transitions from `Client Review` to `Shortlisted`.
+     - Rejection requires a non-empty reason and transitions to `Rejected`.
+     - Both actions atomically write `StageHistory` and `ActivityLog` inside a PostgreSQL `$transaction`.
+- **Consequences**: Complete multi-tenant and cross-client isolation, zero sensitive agency leakage, auditable client review interactions, and truthful communication guarantees.

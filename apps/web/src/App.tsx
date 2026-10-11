@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import {
   Briefcase,
   Layers,
@@ -10,12 +10,14 @@ import {
   LogOut,
   User as UserIcon,
 } from 'lucide-react';
+import { UserRole } from '@hiredesk/shared';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthView } from './pages/AuthView';
 import { JobsView } from './pages/JobsView';
 import { DashboardView } from './pages/DashboardView';
 import { PublicCareerView } from './pages/PublicCareerView';
 import { UnmatchedApplicationsView } from './pages/UnmatchedApplicationsView';
+import { ClientPortalView } from './pages/ClientPortalView';
 
 interface HealthResponse {
   status: string;
@@ -41,6 +43,7 @@ function AppShell() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const { profile, signOut } = useAuth();
+  const isClient = profile?.role === UserRole.CLIENT;
 
   useEffect(() => {
     fetch('/api/health')
@@ -71,22 +74,35 @@ function AppShell() {
           <span>
             Hiredesk<span style={{ color: 'var(--primary)' }}>HR</span>
           </span>
-          <span className="brand-badge">Agency ATS</span>
+          <span className="brand-badge">{isClient ? 'Client Portal' : 'Agency ATS'}</span>
         </div>
 
         <nav className="nav-links">
-          <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
-            <Layers size={16} /> Dashboard
-          </NavLink>
-          <NavLink to="/jobs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <Briefcase size={16} /> Jobs
-          </NavLink>
-          <NavLink to="/unmatched" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <Inbox size={16} /> Unmatched
-          </NavLink>
-          <NavLink to="/system-status" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-            <Activity size={16} /> System Health
-          </NavLink>
+          {isClient ? (
+            <>
+              <NavLink to="/client-portal" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Briefcase size={16} /> Client Portal
+              </NavLink>
+              <NavLink to="/system-status" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Activity size={16} /> System Health
+              </NavLink>
+            </>
+          ) : (
+            <>
+              <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
+                <Layers size={16} /> Dashboard
+              </NavLink>
+              <NavLink to="/jobs" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Briefcase size={16} /> Jobs
+              </NavLink>
+              <NavLink to="/unmatched" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Inbox size={16} /> Unmatched
+              </NavLink>
+              <NavLink to="/system-status" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Activity size={16} /> System Health
+              </NavLink>
+            </>
+          )}
         </nav>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -123,8 +139,8 @@ function AppShell() {
                   style={{
                     fontSize: '0.7rem',
                     textTransform: 'uppercase',
-                    color: 'var(--accent-cyan)',
-                    background: 'rgba(6, 182, 212, 0.1)',
+                    color: isClient ? 'var(--accent-cyan)' : 'var(--primary)',
+                    background: isClient ? 'rgba(6, 182, 212, 0.1)' : 'rgba(99, 102, 241, 0.1)',
                     padding: '0.1rem 0.4rem',
                     borderRadius: '4px',
                   }}
@@ -151,12 +167,16 @@ function AppShell() {
 
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<DashboardView />} />
+          <Route path="/" element={isClient ? <ClientPortalView /> : <DashboardView />} />
+          <Route path="/client-portal" element={<ClientPortalView />} />
           <Route path="/login" element={<AuthView />} />
-          <Route path="/jobs" element={<JobsView />} />
+          <Route path="/jobs" element={isClient ? <Navigate to="/client-portal" replace /> : <JobsView />} />
           <Route path="/career/:orgSlug" element={<PublicCareerView />} />
           <Route path="/career/:orgSlug/:jobCode" element={<PublicCareerView />} />
-          <Route path="/unmatched" element={<UnmatchedApplicationsView />} />
+          <Route
+            path="/unmatched"
+            element={isClient ? <Navigate to="/client-portal" replace /> : <UnmatchedApplicationsView />}
+          />
           <Route path="/system-status" element={<SystemStatusView health={health} loading={loading} error={error} />} />
         </Routes>
       </main>

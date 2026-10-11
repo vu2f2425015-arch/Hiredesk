@@ -86,3 +86,25 @@ graph TD
    - If resume storage fails after candidate creation, database transaction rolls back candidate creation or marks `InboundApplication` as `failed` for safe retry.
 3. **Application Deduplication**:
    - Unique constraint on `(jobId, candidateId)` prevents double-submission if applicant submits twice.
+
+---
+
+## 4. Phase 6 Acceptance Test Matrix: Client Portal, Actions & Isolation Hardening
+
+| Test ID | Module | Scenario / Input | Expected Result | Verified Against |
+| :--- | :--- | :--- | :--- | :--- |
+| **SEC-16** | Client Scope | Recruiter calls `GET /api/client-portal/jobs` | `403 Forbidden` (`FORBIDDEN`) — restricted to client role | Vitest (`clientPortal.test.ts`) |
+| **SEC-17** | Cross-Client Job | Client 1 calls `GET /api/client-portal/jobs/:jobId` for Job of Client 2 | `404 Not Found` (Non-disclosing, zero disclosure) | Vitest + Live Supabase |
+| **SEC-18** | Cross-Client App | Client 1 calls `GET /api/client-portal/applications/:id` for Candidate of Client 2 | `404 Not Found` (Zero disclosure of applicant existence) | Vitest + Live Supabase |
+| **SEC-19** | DTO Protection | Client calls `GET /api/client-portal/applications/:id` with sensitive notes | `recruiterNotes` is completely redacted (`undefined`) | Vitest + Live Supabase |
+| **SEC-20** | Resume Storage Path | Client calls `GET /api/client-portal/applications/:id` | `storagePath`, `bucket`, `checksum` are stripped from `resumes` array | Vitest (`clientPortal.test.ts`) |
+| **SEC-21** | Shortlist Action | Client calls `POST /api/client-portal/applications/:id/shortlist` on `Client Review` app | Transitions to `Shortlisted`, writes `StageHistory` and `ActivityLog` atomically | Vitest + Live Supabase |
+| **SEC-22** | Shortlist State Gate | Client calls `POST .../shortlist` on `Applied` or `Interview` app | `403 Forbidden` — client cannot bypass review stage | Vitest (`clientPortal.test.ts`) |
+| **SEC-23** | Shortlist Idempotency | Client calls `POST .../shortlist` twice on same app | Second call returns cleanly without creating duplicate stage history | Vitest (`clientPortal.test.ts`) |
+| **SEC-24** | Reject Action | Client calls `POST /api/client-portal/applications/:id/reject` with valid reason | Transitions to `Rejected`, writes `StageHistory` and `ActivityLog` atomically | Vitest + Live Supabase |
+| **SEC-25** | Reject State Gate | Client calls `POST .../reject` on non-review application | `403 Forbidden` — client cannot reject outside review/shortlist | Vitest (`clientPortal.test.ts`) |
+| **SEC-26** | Interview Request | Client calls `POST .../request-interview` with time preferences & notes | Persists `InterviewRequest` with `status: 'pending'`, returns explicit coordinating message | Vitest + Live Supabase |
+| **SEC-27** | Interview Honesty | Response inspection for `request-interview` | Must NOT claim scheduled event or sent invite; message confirms pending coordinator status | Vitest + Live Supabase |
+| **SEC-28** | Interview Idempotency| Client calls `POST .../request-interview` twice | Second call returns existing pending request without duplicate DB rows | Vitest (`clientPortal.test.ts`) |
+| **SEC-29** | Signed Resume URL | Client calls `GET /api/client-portal/applications/:id/resume` | Issues authorized 60-second signed URL for download | Vitest (`clientPortal.test.ts`) |
+| **SEC-30** | Cross-Client Resume | Client 1 calls `GET .../resume` for application of Client 2 | `404 Not Found` (Zero resume leak) | Vitest (`clientPortal.test.ts`) |

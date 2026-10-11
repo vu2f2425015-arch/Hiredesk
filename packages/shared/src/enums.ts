@@ -48,3 +48,10 @@ export enum InboundStatus {
   IGNORED = 'ignored',
   DUPLICATE = 'duplicate',
 }
+
+export enum InterviewRequestStatus {
+  PENDING = 'pending',
+  SCHEDULED = 'scheduled',
+  COMPLETED = 'completed',
+  CANCELLED = 'cancelled',
+}

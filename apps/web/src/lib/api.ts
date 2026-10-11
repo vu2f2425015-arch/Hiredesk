@@ -331,6 +331,14 @@ export interface PipelineApplication {
     timestamp: string;
     reason?: string | null;
   } | null;
+  interviewRequests?: Array<{
+    id: string;
+    status: string;
+    preferredTimes?: string[];
+    notes?: string | null;
+    createdAt: string;
+  }>;
+  hasPendingInterviewRequest?: boolean;
 }
 
 export interface JobPipeline {
@@ -499,4 +507,269 @@ export async function fetchCandidates(
   };
 }
 
+// ============================================================================
+// Phase 6: Client Portal API Client Methods
+// ============================================================================
 
+export interface ClientPortalMe {
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    fullName: string | null;
+    role: string;
+    organizationId: string;
+    organizationName: string | null;
+    clientId: string;
+    clientName: string | null;
+  };
+  client: {
+    id: string;
+    name: string;
+    contactEmail: string;
+    status: string;
+  };
+}
+
+export interface ClientPortalJob {
+  id: string;
+  jobCode: string;
+  title: string;
+  department: string | null;
+  employmentType: string;
+  workplaceModel: string;
+  country: string;
+  currency: string;
+  salaryMin: number | null;
+  salaryMax: number | null;
+  openings: number;
+  deadline: string | null;
+  status: string;
+  description: string;
+  requirements: string | null;
+  skills: string[];
+  applicantCount: number;
+  reviewCount: number;
+  shortlistedCount: number;
+  createdAt: string;
+}
+
+export interface ClientPortalApplication {
+  id: string;
+  candidateId: string;
+  jobId: string;
+  jobCode: string;
+  jobTitle: string;
+  stage: string;
+  appliedAt: string;
+  status: string;
+  candidate: {
+    id: string;
+    candidateCode: string;
+    name: string;
+    email: string;
+    phone?: string | null;
+    location?: string | null;
+    skills: string[];
+    education?: any;
+    experience?: any;
+  };
+  answers: Record<string, any>;
+  clientFeedback?: string | null;
+  resumes: Array<{
+    id: string;
+    originalFilename: string;
+    fileSize: number;
+    contentType: string;
+    uploadedAt: string;
+  }>;
+  stageHistories: Array<{
+    id: string;
+    previousStage: string;
+    nextStage: string;
+    reason?: string | null;
+    timestamp: string;
+  }>;
+  interviewRequests: Array<{
+    id: string;
+    status: string;
+    preferredTimes: string[];
+    notes?: string | null;
+    createdAt: string;
+  }>;
+}
+
+export async function fetchClientProfile(token: string): Promise<ClientPortalMe> {
+  const res = await fetch('/api/client-portal/me', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch client profile');
+  }
+  return json.data;
+}
+
+export async function fetchClientJobs(
+  token: string,
+  query?: { search?: string; page?: number; limit?: number }
+): Promise<{ jobs: ClientPortalJob[]; total: number; page: number; limit: number }> {
+  const params = new URLSearchParams();
+  if (query?.search) params.set('search', query.search);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+
+  const res = await fetch(`/api/client-portal/jobs?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch client jobs');
+  }
+  return {
+    jobs: json.data,
+    total: json.meta?.total || json.data.length,
+    page: json.meta?.page || 1,
+    limit: json.meta?.limit || 20,
+  };
+}
+
+export async function fetchClientJobApplications(
+  token: string,
+  jobId: string,
+  query?: { stage?: string; search?: string; page?: number; limit?: number }
+): Promise<{
+  applications: ClientPortalApplication[];
+  total: number;
+  page: number;
+  limit: number;
+  job: { id: string; jobCode: string; title: string };
+}> {
+  const params = new URLSearchParams();
+  if (query?.stage) params.set('stage', query.stage);
+  if (query?.search) params.set('search', query.search);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+
+  const res = await fetch(`/api/client-portal/jobs/${jobId}/applications?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch job applications');
+  }
+  return {
+    applications: json.data,
+    total: json.meta?.total || json.data.length,
+    page: json.meta?.page || 1,
+    limit: json.meta?.limit || 20,
+    job: json.meta?.job || { id: jobId, jobCode: '', title: '' },
+  };
+}
+
+export async function fetchClientApplication(token: string, applicationId: string): Promise<ClientPortalApplication> {
+  const res = await fetch(`/api/client-portal/applications/${applicationId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch application');
+  }
+  return json.data;
+}
+
+export async function fetchClientResumeUrl(
+  token: string,
+  applicationId: string
+): Promise<{ signedUrl: string; filename: string; expiresIn: number }> {
+  const res = await fetch(`/api/client-portal/applications/${applicationId}/resume`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to generate resume download link');
+  }
+  return json.data;
+}
+
+export async function clientShortlistCandidate(
+  token: string,
+  applicationId: string,
+  notes?: string
+): Promise<ClientPortalApplication> {
+  const res = await fetch(`/api/client-portal/applications/${applicationId}/shortlist`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ notes }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to shortlist candidate');
+  }
+  return json.data;
+}
+
+export async function clientRejectCandidate(
+  token: string,
+  applicationId: string,
+  reason: string
+): Promise<ClientPortalApplication> {
+  const res = await fetch(`/api/client-portal/applications/${applicationId}/reject`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ reason }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to reject candidate');
+  }
+  return json.data;
+}
+
+export async function clientRequestInterview(
+  token: string,
+  applicationId: string,
+  preferredTimes: string[],
+  notes?: string
+): Promise<{ id: string; status: string; message: string; preferredTimes: string[]; notes?: string | null }> {
+  const res = await fetch(`/api/client-portal/applications/${applicationId}/request-interview`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ preferredTimes, notes }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to request interview');
+  }
+  return json.data;
+}
+
+export async function clientSubmitFeedback(
+  token: string,
+  applicationId: string,
+  feedback: string
+): Promise<ClientPortalApplication> {
+  const res = await fetch(`/api/client-portal/applications/${applicationId}/feedback`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ feedback }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to submit feedback');
+  }
+  return json.data;
+}

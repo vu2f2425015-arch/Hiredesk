@@ -21,6 +21,7 @@ model Organization {
   candidates          Candidate[]
   applications        Application[]
   activityLogs        ActivityLog[]
+  interviewRequests   InterviewRequest[]
 
   @@map("organizations")
 }
@@ -41,6 +42,7 @@ model UserProfile {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   stageHistories StageHistory[]
+  interviewRequests InterviewRequest[]
 
   @@index([authUserId])
   @@index([organizationId])
@@ -62,6 +64,7 @@ model Client {
   jobs           Job[]
   userProfiles   UserProfile[]
   applications   Application[]
+  interviewRequests InterviewRequest[]
 
   @@index([organizationId, name])
   @@map("clients")
@@ -95,6 +98,7 @@ model Job {
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
   applications          Application[]
+  interviewRequests     InterviewRequest[]
 
   @@index([organizationId, status])
   @@index([clientId])
@@ -148,6 +152,7 @@ model Application {
   updatedAt      DateTime       @updatedAt
   resumes        Resume[]
   stageHistories StageHistory[]
+  interviewRequests InterviewRequest[]
 
   @@unique([jobId, candidateId])
   @@index([organizationId, jobId, stage])
@@ -243,4 +248,30 @@ model ActivityLog {
   @@index([organizationId, timestamp])
   @@index([organizationId, visibility])
   @@map("activity_logs")
+}
+
+model InterviewRequest {
+  id             String       @id @default(uuid())
+  applicationId  String
+  application    Application  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  jobId          String
+  job            Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  clientId       String
+  client         Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  requestedById  String?
+  requestedBy    UserProfile? @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  status         String       @default("pending") // pending, scheduled, completed, cancelled
+  preferredTimes Json         @default("[]")
+  notes          String?      @db.Text
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([applicationId])
+  @@index([jobId])
+  @@index([clientId])
+  @@index([organizationId])
+  @@index([status])
+  @@map("interview_requests")
 }

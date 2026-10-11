@@ -19,6 +19,10 @@ erDiagram
     Candidate ||--o{ Resume : possesses
     Application ||--o{ Resume : links
     Application ||--o{ StageHistory : records
+    Application ||--o{ InterviewRequest : receives
+
+    Client ||--o{ InterviewRequest : "submits"
+    UserProfile ||--o{ InterviewRequest : "initiates"
 
     InboundApplication ||--o| Application : "creates/matches"
     InboundApplication ||--o| Candidate : "creates/reuses"
@@ -218,3 +222,19 @@ System-wide audit trail.
 - `visibility`: VarChar(50) DEFAULT 'internal' (`internal`, `client_visible`)
 - `timestamp`: Timestamp with time zone DEFAULT now()
 - **Indexes**: `(organizationId, timestamp)`, `(organizationId, visibility)`
+
+### 3.11 InterviewRequest
+Persisted interview request record submitted by an authenticated client user for an application.
+*Note: Records an auditable client interview request. It strictly records a pending request and does NOT represent a scheduled calendar event or sent invitation.*
+- `id`: UUID (Primary Key, default `gen_random_uuid()`)
+- `applicationId`: UUID NOT NULL (FK -> `Application.id`, onDelete Cascade)
+- `jobId`: UUID NOT NULL (FK -> `Job.id`, onDelete Cascade)
+- `organizationId`: UUID NOT NULL (FK -> `Organization.id`, onDelete Cascade)
+- `clientId`: UUID NOT NULL (FK -> `Client.id`, onDelete Cascade)
+- `requestedById`: UUID NULL (FK -> `UserProfile.id`, onDelete SetNull)
+- `status`: VarChar(50) DEFAULT 'pending' (`pending`, `scheduled`, `completed`, `cancelled`)
+- `preferredTimes`: JSONB DEFAULT '[]' (Array of proposed time slots)
+- `notes`: Text NULL (Specific context or notes from client)
+- `createdAt`: Timestamp with time zone DEFAULT now()
+- `updatedAt`: Timestamp with time zone DEFAULT now()
+- **Indexes**: `(applicationId)`, `(organizationId, clientId)`, `(jobId)`, `(status)`, `(createdAt)`

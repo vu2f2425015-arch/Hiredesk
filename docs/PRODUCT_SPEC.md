@@ -97,10 +97,20 @@ sequenceDiagram
 - Two-tier notes: Recruiter internal notes (hidden from clients) vs. Client-visible feedback.
 
 ### 4.5 Client Portal
-- Restricted view for client hiring managers.
-- Filtered strictly to jobs where `job.clientId == user.clientId`.
-- Candidates submitted to client review can be viewed with authorized resume access.
-- Actions: Shortlist, Reject, Request Interview, Leave Review Notes.
+- Restricted view for client hiring managers with role `client`.
+- Filtered strictly to jobs and applications where `job.clientId == user.clientId` and `job.organizationId == user.organizationId`.
+- Non-disclosing `404 Not Found` for any resource requested outside the client's assigned scope (eliminates cross-client ID enumeration).
+- Safe Client DTOs:
+  - Redacts internal `recruiterNotes` (`undefined`).
+  - Redacts private resume storage paths (`storagePath`, `bucket`, `checksum`).
+  - Redacts internal activity logs and raw email payloads.
+- Authorized private resume access via 60-second expiring signed URLs (`GET /api/client-portal/applications/:id/resume`).
+- Client Review Actions:
+  - **Shortlist**: Idempotent transition from `Client Review` to `Shortlisted` with atomic `StageHistory` and `ActivityLog`.
+  - **Reject**: Rejects candidate with mandatory non-empty reason.
+  - **Submit Feedback**: Updates shared `clientFeedback` without touching recruiter notes.
+  - **Request Interview**: Persists an auditable `InterviewRequest` entity with `status = 'pending'`. *Critical Guarantee: Does NOT pretend a calendar invitation was sent or meeting was scheduled. Returns honest pending status and notifies agency recruiters.*
+
 
 ### 4.6 Unmatched Application Queue
 - Dashboard view for recruiters to inspect inbound emails that failed automatic matching.
