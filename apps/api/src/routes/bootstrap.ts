@@ -23,7 +23,13 @@ bootstrapRouter.post('/bootstrap/super-admin', async (req: Request, res: Respons
 
   const { authUserId, email, firstName, lastName, bootstrapSecret } = parseResult.data;
 
-  // 1. Verify bootstrap secret
+  // 1. Verify bootstrap secret (strictly disallow default secret in production)
+  if (config.NODE_ENV === 'production' && config.BOOTSTRAP_SECRET === 'hiredesk-local-bootstrap-secret') {
+    logger.error('Refused bootstrap: default BOOTSTRAP_SECRET cannot be used in production environment');
+    sendError(res, 'FORBIDDEN', 'Default bootstrap secret is prohibited in production', 403);
+    return;
+  }
+
   if (bootstrapSecret !== config.BOOTSTRAP_SECRET) {
     logger.warn({ email, authUserId }, 'Unauthorized bootstrap attempt with invalid secret');
     sendError(res, 'UNAUTHORIZED', 'Invalid platform bootstrap secret', 401);

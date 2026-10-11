@@ -38,7 +38,7 @@ export class ImapFlowFetcher implements MailboxFetcher {
       secure: workerConfig.IMAP_SECURE,
       auth: {
         user: workerConfig.IMAP_USERNAME,
-        pass: workerConfig.IMAP_PASSWORD,
+        pass: workerConfig.IMAP_PASSWORD.trim().replace(/\s+/g, ''),
       },
       logger: false,
     });
@@ -131,6 +131,7 @@ export class ImapFlowFetcher implements MailboxFetcher {
 export class ImapWorkerDaemon {
   private fetcher: MailboxFetcher;
   private isRunning = false;
+  private isStopping = false;
   private isPolling = false;
   private pollIntervalTimer: NodeJS.Timeout | null = null;
   private consecutiveErrors = 0;
@@ -146,6 +147,7 @@ export class ImapWorkerDaemon {
   async start(): Promise<void> {
     if (this.isRunning) return;
     this.isRunning = true;
+    this.isStopping = false;
 
     logger.info(
       {
@@ -167,7 +169,7 @@ export class ImapWorkerDaemon {
   }
 
   async stop(): Promise<void> {
-    if (!this.isRunning) return;
+    this.isStopping = true;
     this.isRunning = false;
 
     if (this.pollIntervalTimer) {
@@ -201,7 +203,7 @@ export class ImapWorkerDaemon {
       logger.info({ messageCount: messages.length }, 'Fetched messages from inbound mailbox');
 
       for (const msg of messages) {
-        if (!this.isRunning) break;
+        if (this.isStopping) break;
 
         const senderEmail = msg.envelope.from?.[0]?.address || 'unknown@sender.com';
         const senderName = msg.envelope.from?.[0]?.name || null;

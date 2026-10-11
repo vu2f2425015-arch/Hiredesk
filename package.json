@@ -15,6 +15,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:live-inbound": "node test_live_gmail_inbound.mjs",
+    "test:replay": "node test_inbound_replay_idempotency.mjs",
+    "verify:mail": "node verify_mail_services.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\""
   },

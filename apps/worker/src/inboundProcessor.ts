@@ -257,6 +257,25 @@ export async function processInboundEmail(
         failureReason: INBOUND_FAILURE_REASONS.JOB_CODE_NOT_FOUND,
       };
     }
+
+    // Audit check: Detect discrepancy between subject job title and database job title
+    // Preserves exact job-code matching while logging discrepancy for auditability
+    if (parsed.subject && targetJob.title) {
+      const subjectLower = parsed.subject.toLowerCase();
+      const titleWords = targetJob.title.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3);
+      const hasTitleOverlap = titleWords.some((w: string) => subjectLower.includes(w));
+      if (!hasTitleOverlap) {
+        logger.warn(
+          {
+            jobCode: targetJob.jobCode,
+            databaseJobTitle: targetJob.title,
+            emailSubject: parsed.subject,
+            recordId: record.id,
+          },
+          'Notice: Email subject mentions a job title differing from database job record. Deterministic job-code matching was preserved.'
+        );
+      }
+    }
   }
 
   // 3. Verify Job is accepting applications

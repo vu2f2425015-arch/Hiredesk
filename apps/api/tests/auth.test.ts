@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { setTokenVerifier, resetTokenVerifier } from '../src/services/auth.js';
+import { config } from '../src/config/index.js';
 import { UserRole } from '@hiredesk/shared';
 
 // Mock the @hiredesk/database module
@@ -296,6 +297,29 @@ describe('Phase 1: Supabase Authentication & Multi-Tenant Authorization Suite', 
       expect(res.body.success).toBe(false);
       expect(res.body.error.code).toBe('CONFLICT');
       expect(res.body.error.message).toContain('Platform super-admin has already been bootstrapped');
+    });
+
+    it('Refuses bootstrap with default secret when NODE_ENV is production (403 Forbidden)', async () => {
+      const originalEnv = config.NODE_ENV;
+      (config as any).NODE_ENV = 'production';
+      try {
+        const res = await request(app)
+          .post('/api/bootstrap/super-admin')
+          .send({
+            authUserId: '123e4567-e89b-12d3-a456-426614174000',
+            email: 'prod-admin@platform.com',
+            firstName: 'Prod',
+            lastName: 'Admin',
+            bootstrapSecret: 'hiredesk-local-bootstrap-secret',
+          });
+
+        expect(res.status).toBe(403);
+        expect(res.body.success).toBe(false);
+        expect(res.body.error.code).toBe('FORBIDDEN');
+        expect(res.body.error.message).toContain('Default bootstrap secret is prohibited in production');
+      } finally {
+        (config as any).NODE_ENV = originalEnv;
+      }
     });
 
     it('Successfully bootstraps the very first platform super_admin when valid secret and 0 admins exist', async () => {

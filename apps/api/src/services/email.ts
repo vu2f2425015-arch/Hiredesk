@@ -60,7 +60,7 @@ export class EmailService {
       secure: config.SMTP_SECURE,
       auth: {
         user: config.SMTP_USERNAME,
-        pass: config.SMTP_PASSWORD,
+        pass: (config.SMTP_PASSWORD || '').trim().replace(/\s+/g, ''),
       },
       tls: {
         rejectUnauthorized: config.NODE_ENV === 'production',

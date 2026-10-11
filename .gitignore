@@ -13,6 +13,8 @@ build/
 .env.local
 .env.*.local
 !.env.example
+*password*.txt
+*credentials*.txt
 
 # Testing & Coverage
 coverage/
@@ -32,6 +34,7 @@ tmp/
 .idea/
 .DS_Store
 Thumbs.db
+*.zip
 
 # Existing reference archives
 Zoo-Code-main/
