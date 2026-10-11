@@ -17,6 +17,9 @@ import { inboundRouter } from './routes/inbound.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { clientPortalRouter } from './routes/clientPortal.js';
 import { interviewsRouter } from './routes/interviews.js';
+import { talentPoolRouter } from './routes/talentPool.js';
+import { notificationsRouter } from './routes/notifications.js';
+import { aiRecruiterRouter } from './routes/aiRecruiter.js';
 import { sendError } from './utils/response.js';
 
 export function createApp(): Express {
@@ -55,6 +58,9 @@ export function createApp(): Express {
   app.use('/api', analyticsRouter);
   app.use('/api', clientPortalRouter);
   app.use('/api', interviewsRouter);
+  app.use('/api/talent-pool', talentPoolRouter);
+  app.use('/api/notifications', notificationsRouter);
+  app.use('/api/ai-recruiter', aiRecruiterRouter);
 
 
   // Fallthrough 404 handler

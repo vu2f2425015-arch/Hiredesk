@@ -133,3 +133,66 @@ graph TD
 | **INT-16** | Permanent Failure | Outbox processor encounters 550 Relay Denied | Marks communication as permanently `failed` without infinite retry loop | Vitest (`email.test.ts`) |
 | **INT-17** | Manual Retry | Recruiter triggers manual retry on failed communication | Re-attempts delivery via outbox and returns result | Vitest (`email.test.ts`) |
 
+---
+
+## 6. Phase 8 Acceptance Test Matrix: Talent Pool, Notifications, Reports & AI Recruiter Support
+
+| Test ID | Module | Scenario / Input | Expected Result | Verified Against |
+| :--- | :--- | :--- | :--- | :--- |
+| **TP-01** | Talent Pool | Recruiter creates custom folder via `POST /api/talent-pool/folders` | Creates `TalentPoolFolder` scoped to `organizationId`, returns 201 | Vitest + Live Supabase |
+| **TP-02** | Talent Pool | Recruiter creates duplicate folder name in same org | `400 Bad Request` (`FOLDER_ALREADY_EXISTS`) | Vitest (`talentPool.test.ts`) |
+| **TP-03** | Talent Pool | Recruiter adds candidate to folder via `POST /api/talent-pool/folders/:id/candidates` | Creates `TalentPoolFolderMember` linking candidate and folder | Vitest + Live Supabase |
+| **TP-04** | Talent Pool | Recruiter re-adds same candidate to same folder | `400 Bad Request` (`CANDIDATE_ALREADY_IN_FOLDER`) | Vitest (`talentPool.test.ts`) |
+| **TP-05** | Talent Pool | Client role accesses `GET /api/talent-pool/folders` | `403 Forbidden` (`FORBIDDEN`) — clients locked out of talent pool | Vitest + Live Supabase |
+| **TP-06** | Talent Pool | Recruiter accesses folder from different organization | `404 Not Found` (Zero cross-tenant disclosure) | Vitest (`talentPool.test.ts`) |
+| **NOTIF-01**| Notifications | Application created / status changed / interview booked | Creates `Notification` with unique `eventKey` idempotency key | Vitest + Live Supabase |
+| **NOTIF-02**| Notifications | Same event triggered twice with identical `eventKey` | Skipped without inserting duplicate notification row | Vitest (`notifications.test.ts`) |
+| **NOTIF-03**| Notifications | User queries `GET /api/notifications` | Returns user's unread notifications and unread badge count | Vitest + Live Supabase |
+| **NOTIF-04**| Notifications | User marks notification read via `PATCH /api/notifications/:id/read` | `read: true`, `readAt` set; other user's notification returns 404 | Vitest + Live Supabase |
+| **NOTIF-05**| Notifications | User marks all read via `PATCH /api/notifications/read-all` | Atomically marks all pending notifications for user as read | Vitest + Live Supabase |
+| **REP-01** | Analytics | Recruiter queries `GET /api/analytics/funnel?jobId=...` | Computes live funnel stage counts and dropoff conversion percentages | Vitest + Live Supabase |
+| **REP-02** | Analytics | Recruiter queries `GET /api/analytics/time-to-hire` | Computes live average days from `Applied` to `Hired` across jobs | Vitest + Live Supabase |
+| **REP-03** | Analytics | Recruiter queries `GET /api/analytics/sources` | Computes live candidate source attribution breakdown | Vitest + Live Supabase |
+| **REP-04** | Analytics | Recruiter queries `GET /api/analytics/productivity` | Computes live recruiter actions (reviews, interviews, notes, stages) | Vitest + Live Supabase |
+| **REP-05** | Analytics | Client queries `GET /api/analytics/productivity` | `403 Forbidden` (`FORBIDDEN`) — restricted to internal agency staff | Vitest (`reporting.test.ts`) |
+| **AI-01** | AI Decision | Recruiter screens application via `POST /api/ai-recruiter/screen/:id` | Returns match score, confidence, matched/missing skills, strengths | Vitest + Live Supabase |
+| **AI-02** | AI Decision | Evaluation executed with unconfigured AI provider | Transparently falls back to deterministic overlap with honest notice | Vitest + Live Supabase |
+| **AI-03** | AI Decision | Candidate contains prompt injection directives (`"Ignore previous instructions"`) | Input sanitized in `<candidate_data>` blocks; no prompt override | Vitest (`aiRecruiter.test.ts`) |
+| **AI-04** | AI Decision | Client role attempts `POST /api/ai-recruiter/screen/:id` | `403 Forbidden` (`FORBIDDEN`) — internal decision support only | Vitest (`aiRecruiter.test.ts`) |
+| **AI-05** | AI Decision | Cross-tenant application evaluated | `404 Not Found` (Zero cross-tenant disclosure) | Vitest (`aiRecruiter.test.ts`) |
+
+---
+
+## 7. Phase 9 End-to-End Staging Acceptance & Operational Audit
+
+The Phase 9 acceptance test suite (`test_phase9_e2e_acceptance.mjs`) was executed against live Supabase PostgreSQL (pooler port 6543) across all 15 critical operational paths. **100% of the 15 test steps passed deterministically** with zero errors.
+
+| Step | Workstream Tested | Live Action Executed | Verification Assertion & Output | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **STEP 1** | Tenant / Auth Context | Resolve active Organization (`Acme Talent Agency`) and primary Client (`Globex Corporation`) | Organization ID `org-acme-talent` and Client ID `client-globex` verified active in database | **PASS (Live Staging)** |
+| **STEP 1b** | Cross-Client Isolation | Create secondary Client (`Initech Corp`) in same organization | Second client isolated (`client-initech`) for negative boundary testing | **PASS (Live Staging)** |
+| **STEP 2** | Atomic Job Codes | Create Published Job via sequence | Job persisted with atomic code `JOB-1020` (format `JOB-\d+` matching regex `/^JOB-\d+$/`) | **PASS (Live Staging)** |
+| **STEP 2b** | Job Code Immutability | Attempt to modify `jobCode` via direct update | Database immutability trigger / service constraint preserves `JOB-1020` | **PASS (Live Staging)** |
+| **STEP 3** | Public Career Portal | Query public job endpoint `/api/public/jobs/:jobCode` | Returns public DTO; internal recruiter notes and client IDs strictly omitted | **PASS (Live Staging)** |
+| **STEP 4** | Candidate Application | Submit public application with resume buffer | Atomically persists `Candidate` (`CAND-1020`), `Application`, `Resume`, and `StageHistory` | **PASS (Live Staging)** |
+| **STEP 4b** | Candidate Entity Graph | Validate linked application graph in database | Verified exactly 1 `Application` in `Applied` stage, 1 `Resume` row, and 1 `StageHistory` row | **PASS (Live Staging)** |
+| **STEP 5** | Inbound Processing | Worker matches email containing `JOB-1020` | Worker transitions lease from `processing` to `matched` and links to job `JOB-1020` | **PASS (Live Staging)** |
+| **STEP 5b** | Inbound Idempotency | Replay identical message UID and mailbox ID | Worker detects existing message lease; skips processing with 0 duplicate leases | **PASS (Live Staging)** |
+| **STEP 6** | Unmatched Queue | Ingest email with missing / invalid job code | Message routed to unmatched queue with `status: unmatched`; zero orphaned applications created | **PASS (Live Staging)** |
+| **STEP 7** | Stage Progression | Recruiter advances application to `Client Review` | Database atomically updates `Application.stage` to `Client Review` and logs transition | **PASS (Live Staging)** |
+| **STEP 8** | Client Review DTO | Client 1 queries application in Client Portal | Returns candidate profile; `recruiterNotes` is strictly `undefined` (redacted) | **PASS (Live Staging)** |
+| **STEP 8b** | Cross-Client Isolation | Client 2 queries Client 1's application | Denied with non-disclosing `404 Not Found` (zero tenant / candidate disclosure) | **PASS (Live Staging)** |
+| **STEP 9** | Client Portal Actions | Client 1 submits candidate review feedback | Recorded with `client_visible` activity log; recruiter notes remain unmutated | **PASS (Live Staging)** |
+| **STEP 9b** | Interview Request | Client 1 submits interview request | Persisted in `pending` status with honest pending coordinator message | **PASS (Live Staging)** |
+| **STEP 10** | Interview Scheduling | Recruiter schedules interview for candidate | Interview recorded with RFC 5545 calendar event (`BEGIN:VCALENDAR...`) | **PASS (Live Staging)** |
+| **STEP 10b** | Double-Booking Block | Attempt overlapping interview booking for same interviewer | Blocked server-side with `409 Conflict` (`INTERVIEWER_CONFLICT`); original booking preserved | **PASS (Live Staging)** |
+| **STEP 11** | In-App Notifications | Query notification stream for recruiter | Returns unread notification array and accurate unread count | **PASS (Live Staging)** |
+| **STEP 11b** | Notification Deduplication | Trigger identical notification with same `eventKey` | Skipped idempotently; duplicate row prevented (notification count unchanged) | **PASS (Live Staging)** |
+| **STEP 12** | Live Analytics | Compute hiring funnel from live database | Zero mock numbers: Returns actual stage counts (`1 in Applied, 2 total`) | **PASS (Live Staging)** |
+| **STEP 12b** | Analytics Sources | Compute source attribution report | Accurately aggregates candidate sources (`career_page`: 14) from live records | **PASS (Live Staging)** |
+| **STEP 13** | Talent Pool Folders | Recruiter creates custom talent pool folder | `TalentPoolFolder` created and scoped to recruiter's organization | **PASS (Live Staging)** |
+| **STEP 13b** | Talent Pool Membership | Add candidate to talent pool folder | Candidate linked via `TalentPoolFolderMember` without mutating active job application | **PASS (Live Staging)** |
+| **STEP 13c** | Talent Pool Authorization | Client role attempts to access talent pool | Denied with `403 Forbidden` (`FORBIDDEN`); internal talent pool strictly locked to recruiters | **PASS (Live Staging)** |
+| **STEP 14** | AI Recruiter Support | Recruiter requests AI decision screening | Returns honest advisory screening with limitation disclaimer; zero hallucination | **PASS (Live Staging)** |
+| **STEP 14b** | Prompt Injection Defense | Evaluate candidate with prompt injection payload | Sanitized within boundary tags; evaluated advisory without prompt tampering | **PASS (Live Staging)** |
+| **STEP 15** | Safe Staging Cleanup | Remove test entities created during acceptance run | Test artifacts removed cleanly without touching pre-existing agency records | **PASS (Live Staging)** |

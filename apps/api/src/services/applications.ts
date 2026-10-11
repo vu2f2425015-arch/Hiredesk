@@ -11,6 +11,7 @@ import {
 } from '@hiredesk/shared';
 import { AuthenticatedUser } from '../middleware/auth.js';
 import { StorageService, validateUploadedFile } from './storage.js';
+import { NotificationService } from './notifications.js';
 import { logger } from '../utils/logger.js';
 
 export interface PublicApplyResult {
@@ -222,8 +223,23 @@ export class ApplicationService {
           },
         });
 
+        await NotificationService.notifyAgencyMembers(tx, organization.id, {
+          type: 'new_application',
+          title: 'New Candidate Application',
+          message: `${candidate.name} applied for ${job.title} (${job.jobCode})`,
+          entityType: 'application',
+          entityId: app.id,
+          actionUrl: `/applications/${app.id}`,
+          eventKey: `new_app:${app.id}`,
+          metadata: {
+            candidateName: candidate.name,
+            jobTitle: job.title,
+            jobCode: job.jobCode,
+          },
+        });
+
         return app;
-      });
+      }, { timeout: 35000, maxWait: 15000 });
 
       return {
         applicationId: result.id,
@@ -539,8 +555,29 @@ export class ApplicationService {
         },
       });
 
+      // Dispatch internal notification to agency team (exclude acting user)
+      await NotificationService.notifyAgencyMembers(
+        tx,
+        app.organizationId,
+        {
+          type: 'stage_transition',
+          title: `Candidate Moved to ${nextStage}`,
+          message: `${app.candidate.name} moved from ${previousStage} to ${nextStage} (${app.job.title})`,
+          entityType: 'application',
+          entityId: app.id,
+          actionUrl: `/applications/${app.id}`,
+          metadata: {
+            candidateName: app.candidate.name,
+            jobTitle: app.job.title,
+            fromStage: previousStage,
+            toStage: nextStage,
+          },
+        },
+        user.id
+      );
+
       return updatedApp;
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return ApplicationService.getApplicationById(user, updated.id);
   }
@@ -623,7 +660,7 @@ export class ApplicationService {
       });
 
       return res;
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return ApplicationService.getApplicationById(user, updated.id);
   }

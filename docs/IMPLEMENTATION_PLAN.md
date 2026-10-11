@@ -190,7 +190,62 @@ This document tracks the phased implementation of HiredeskHR. Each phase must be
 
 ---
 
-### [POST-MVP] Phase 8 — Talent Pool, Analytics & Decision Support
-- [ ] Organization-wide candidate talent pool search.
-- [ ] SQL-derived analytics and time-to-hire reports.
-- [ ] Explainable AI resume-to-job matching with documented scoring criteria.
+### [COMPLETED] Phase 8 — Talent Pool, Advanced Reporting, In-App Notifications & Gated AI Recruiter
+- [x] **Phase 8A: Organization-Scoped Talent Pool & Candidate Association**:
+  - `TalentPoolFolder` & `TalentPoolFolderMember` models with versioned migration applied to live Supabase.
+  - Multi-job candidate association: candidate profile decoupled from single applications; can be linked to multiple jobs without identity duplication.
+  - Organization-scoped search, skill filters, location filters, and custom folder management.
+  - Recruiter view `/talent-pool` with folder CRUD, candidate assignment modal, and candidate profile drawer.
+  - 17 unit tests in `talentPool.test.ts` and 6 live Supabase integration tests in `test_phase8a_e2e.mjs`.
+- [x] **Phase 8B: Advanced Reporting & Durable In-App Notifications**:
+  - `Notification` Prisma model with `eventKey` deduplication and live Supabase migration.
+  - Notification triggers: new applications, interview scheduled, client feedback submitted, stage transitions.
+  - In-app notification bell dropdown in header with real-time badge count, mark as read, and direct action navigation.
+  - Database-backed reports (zero mock metrics):
+    - Funnel & conversion rates across canonical stages.
+    - Time-to-hire report with average, median, fastest, slowest days, and stage durations.
+    - Candidate acquisition sources with hire conversion rate.
+    - Recruiter productivity (stage transitions, interviews, notes logged).
+    - Per-job outcomes (total applicants, active, hired, rejected).
+  - Dedicated `/reports` dashboard view (`ReportsView.tsx`) with honest zero states.
+  - 13 unit tests (`notifications.test.ts`, `reporting.test.ts`) and 9 live Supabase integration tests in `test_phase8b_e2e.mjs`.
+- [x] **Phase 8C: AI Recruiter Decision Support (Strictly Gated Delivery)**:
+  - Transparent fallback: When no external AI provider key is configured, honestly reports limitation notice (`"No external AI provider configured. Evaluated using deterministic skill/requirement overlap baseline."`).
+  - Zero hallucination guarantee: exact deterministic skill overlap ratio, missing skills, and experience checks. No fabricated percentage scores or automatic rejection/hiring decisions.
+  - External Gemini adapter with prompt injection boundary defense (`<candidate_data>` isolation).
+  - Human-in-the-loop governance disclaimer strictly included on every assessment.
+  - Integrated AI Decision Support card in `CandidateProfileModal.tsx`.
+  - 7 unit tests in `aiRecruiter.test.ts` and live Supabase integration verification in `test_phase8c_e2e.mjs`.
+
+---
+
+### [COMPLETED] Phase 9 — Release Readiness, End-to-End Acceptance, Security Audit & Deployment
+- [x] **Workstream A: Production Environment Configuration & Secret Auditing**:
+  - Full environment variable matrix documented in `docs/RELEASE_READINESS.md` across API, Worker, Database, and Web.
+  - Client web bundle leak audit: Verified `apps/web/dist` contains zero server secrets (`DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `IMAP_PASS`, `SMTP_PASS`).
+  - Structured logging PII redaction audited: Pino configured to redact headers, bearer tokens, passwords, and API keys.
+- [x] **Workstream B: Supabase Migration Audit & Safe Rollout**:
+  - All migrations (`00_initial_schema` through `07_ai_screenings`) audited and verified idempotent on live PostgreSQL pooler.
+  - Foreign key cascades, immutability triggers, and index coverage verified without table drops or data loss.
+- [x] **Workstream C: Critical Multi-Tenant & Multi-Client Isolation Verification**:
+  - Comprehensive RBAC matrix audited (Super Admin, Agency Admin, Recruiter, Client).
+  - Non-disclosing `404 Not Found` verified on cross-tenant and cross-client ID tampering.
+  - Recruiter notes, interviewer notes, and storage paths verified 100% stripped from Client Portal DTOs.
+- [x] **Workstream D: Worker Resilience, Idempotency & Replay Verification**:
+  - Inbound email processor verified against duplicate processing: 0 duplicate leases on replay.
+  - Unmatched applications safely routed to quarantined status without orphan entity creation.
+  - Interactive Prisma transaction timeouts configured to 35s to withstand cloud PgBouncer latency.
+- [x] **Workstream E: Client Portal Confidentiality & Workflow Verification**:
+  - Client actions (shortlist, reject, interview request, feedback) verified against live database.
+  - Interview requests marked truthfully as `pending` coordinator action.
+- [x] **Workstream F: Zero-Mock Data Guarantee Audit**:
+  - Analytics and reporting verified computing live counts from PostgreSQL tables.
+  - AI Recruiter decision support verified strictly advisory with deterministic baseline fallback.
+- [x] **Workstream G: End-to-End Staging Acceptance Suite**:
+  - Created and executed `test_phase9_e2e_acceptance.mjs`.
+  - **15 of 15 end-to-end steps passed** deterministically against live Supabase PostgreSQL.
+  - Clean build (`npm run build`), clean typecheck (`npm run typecheck`), and 187/187 unit tests passing.
+- [x] **Workstream H: Release Documentation & Operational Runbooks**:
+  - Created `docs/RELEASE_READINESS.md` with deployment sequence, monitoring thresholds, and operational runbooks.
+  - Created `docs/SECURITY_AUDIT.md` with authorization boundaries and threat mitigations.
+  - Updated `docs/ACCEPTANCE_TESTS.md` with Section 7 documenting Phase 9 results.

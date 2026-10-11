@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   CreateJobSchema,
   UpdateJobSchema,
@@ -12,11 +13,27 @@ import { sendSuccess, sendError } from '../utils/response.js';
 
 export const jobsRouter = Router();
 
+// Configure Rate Limiting for Public Career Browsing
+const publicCareerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    sendError(
+      res,
+      'RATE_LIMIT_EXCEEDED',
+      'Too many career page requests from this IP. Please wait before trying again.',
+      429
+    );
+  },
+});
+
 // ============================================================================
 // Public Career Endpoints (No Authentication Required)
 // ============================================================================
 
-jobsRouter.get('/career/:orgSlug/jobs', async (req: Request, res: Response, next: NextFunction) => {
+jobsRouter.get('/career/:orgSlug/jobs', publicCareerLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgSlug } = req.params;
     const result = await JobService.getPublicCareerJobs(orgSlug);
@@ -30,7 +47,7 @@ jobsRouter.get('/career/:orgSlug/jobs', async (req: Request, res: Response, next
   }
 });
 
-jobsRouter.get('/career/:orgSlug/jobs/:jobCode', async (req: Request, res: Response, next: NextFunction) => {
+jobsRouter.get('/career/:orgSlug/jobs/:jobCode', publicCareerLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgSlug, jobCode } = req.params;
     const job = await JobService.getPublicCareerJobByCode(orgSlug, jobCode);

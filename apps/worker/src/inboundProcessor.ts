@@ -580,7 +580,7 @@ export async function processInboundEmail(
       });
 
       return app;
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return {
       inboundId: record.id,

@@ -15,6 +15,7 @@ import {
 import { AuthenticatedUser } from '../middleware/auth.js';
 import { StorageService } from './storage.js';
 import { generateIcsCalendar } from './calendar.js';
+import { NotificationService } from './notifications.js';
 
 export class ClientPortalService {
   /**
@@ -541,7 +542,7 @@ export class ClientPortalService {
           visibility: 'client_visible',
         },
       });
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return this.getApplicationById(user, app.id);
   }
@@ -644,7 +645,7 @@ export class ClientPortalService {
           visibility: 'client_visible',
         },
       });
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return this.getApplicationById(user, app.id);
   }
@@ -760,8 +761,24 @@ export class ClientPortalService {
         },
       });
 
+      // Dispatch internal notification to agency team (client users excluded)
+      await NotificationService.notifyAgencyMembers(tx, organizationId, {
+        type: 'interview_requested',
+        title: 'Client Requested Interview',
+        message: `Client requested an interview for ${app.candidate.name} (${app.job.title})`,
+        entityType: 'application',
+        entityId: app.id,
+        actionUrl: `/applications/${app.id}`,
+        eventKey: `interview_requested:${created.id}`,
+        metadata: {
+          jobCode: app.job.jobCode,
+          candidateName: app.candidate.name,
+          interviewRequestId: created.id,
+        },
+      });
+
       return created;
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return {
       id: request.id,
@@ -842,7 +859,22 @@ export class ClientPortalService {
           visibility: 'client_visible',
         },
       });
-    });
+
+      // Dispatch internal notification to agency team (client users excluded)
+      await NotificationService.notifyAgencyMembers(tx, organizationId, {
+        type: 'client_feedback',
+        title: 'Client Feedback Submitted',
+        message: `Client provided feedback for ${app.candidate.name} (${app.job.title})`,
+        entityType: 'application',
+        entityId: app.id,
+        actionUrl: `/applications/${app.id}`,
+        metadata: {
+          jobCode: app.job.jobCode,
+          candidateName: app.candidate.name,
+          feedbackSnippet: feedback.slice(0, 100),
+        },
+      });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return this.getApplicationById(user, app.id);
   }

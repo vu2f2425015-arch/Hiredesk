@@ -24,6 +24,7 @@ import {
   renderInterviewCancelled,
 } from './emailTemplates.js';
 import { EmailService } from './email.js';
+import { NotificationService } from './notifications.js';
 import { logger } from '../utils/logger.js';
 
 export class InterviewService {
@@ -566,6 +567,24 @@ export class InterviewService {
         },
       });
 
+      // Dispatch internal notification to interviewer
+      await NotificationService.createNotification(tx, {
+        organizationId: orgId,
+        userId: input.interviewerUserProfileId,
+        type: 'interview_scheduled',
+        title: 'Interview Scheduled',
+        message: `Interview scheduled with ${application.candidate.name} for ${application.job.title}`,
+        entityType: 'Interview',
+        entityId: newInterview.id,
+        actionUrl: `/interviews`,
+        eventKey: `interview_scheduled:${newInterview.id}:${input.interviewerUserProfileId}`,
+        metadata: {
+          candidateName: application.candidate.name,
+          jobTitle: application.job.title,
+          startAt: startAt.toISOString(),
+        },
+      });
+
       // Prepare updated .ics with real ID
       const realIcsContent = icsContent.replace('interview-pending@', `interview-${newInterview.id}@`);
 
@@ -640,7 +659,7 @@ export class InterviewService {
       }
 
       return { newInterview, candCommId: candComm.id, clientCommId: clientComm?.id };
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     // Trigger immediate outbox delivery in background (best-effort)
     setImmediate(async () => {
@@ -842,7 +861,7 @@ export class InterviewService {
       });
 
       return { commId: comm.id };
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     setImmediate(async () => {
       try {
@@ -996,7 +1015,7 @@ export class InterviewService {
       });
 
       return { commId: comm.id };
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     setImmediate(async () => {
       try {
@@ -1081,7 +1100,7 @@ export class InterviewService {
           visibility: 'client_visible',
         },
       });
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return this.getInterview(user, interview.id);
   }
@@ -1155,7 +1174,7 @@ export class InterviewService {
           visibility: 'internal',
         },
       });
-    });
+    }, { timeout: 35000, maxWait: 15000 });
 
     return this.getInterview(user, interview.id);
   }
