@@ -141,3 +141,56 @@
   5. Strict XSS prevention: Dynamic parameters in HTML email templates are sanitized with HTML entity escaping (`escapeHtml`).
 - **Consequences**: Guarantees zero lost messages, atomic consistency between interview state and communication logs, transparent delivery tracking, and resilient error recovery.
 
+---
+
+## ADR-013: Organization-Scoped Talent Pool & Decoupled Candidate Sourcing
+- **Status**: Accepted
+- **Context**: Recruitment agencies build long-term candidate relationships across multiple past jobs, silver medalists, and proactively sourced talent. Candidates cannot remain isolated inside single job silos; recruiters need organizational folders (e.g. "Senior React Engineers", "Executive Leadership") to rediscover and tag candidates without leaking these proprietary lists to client portal users.
+- **Decision**:
+  1. Introduce `TalentPoolFolder` and `TalentPoolFolderMember` models strictly scoped to `Organization`.
+  2. Candidates can belong to multiple folders across the agency without affecting their existing job applications or pipeline stages.
+  3. Client portal users (`role = 'client'`) are categorically barred from talent pool endpoints (`403 Forbidden`).
+  4. Recruiters can add candidates with optional curation notes (`TalentPoolFolderMember.notes`).
+- **Consequences**: Sourcing lists are decoupled from fleeting job vacancies; agency candidate data is permanently leveraged while preserving confidentiality.
+
+---
+
+## ADR-014: In-App User Notifications with Event-Key Deduplication
+- **Status**: Accepted
+- **Context**: In a collaborative ATS, recruiters must be immediately alerted when applications arrive, stages change, client hiring managers provide feedback, or interviews are scheduled. Sending duplicate alerts due to retry workers or concurrent API requests degrades user trust.
+- **Decision**:
+  1. Implement a database-backed `Notification` entity linked to `UserProfile` with read states (`read`, `readAt`).
+  2. Implement idempotent deduplication using unique `eventKey` strings (e.g., `app-received-{id}`, `stage-changed-{appId}-{toStage}`). Subsequent attempts to insert an existing `eventKey` within the organization are safely skipped.
+  3. Wire notifications automatically inside application creation, stage progressions, client portal feedback, and interview bookings.
+  4. Client portal users never receive internal recruiter notifications.
+- **Consequences**: Reliable, clutter-free notification stream with zero duplicate entries and strict multi-tenant privacy.
+
+---
+
+## ADR-015: Live Database SQL Aggregations for Recruitment Analytics
+- **Status**: Accepted
+- **Context**: ATS reporting (recruitment funnels, time-to-hire, source attribution, recruiter productivity) is often mocked with hardcoded sample charts or calculated inefficiently by downloading all historical records into memory on the client side.
+- **Decision**:
+  1. Calculate all reporting metrics directly within PostgreSQL using Prisma and atomic SQL aggregations.
+  2. Funnel metrics compute conversion dropoff across canonical stages (`Applied` -> `Screening` -> `Shortlisted` -> `Interview` -> `Client Review` -> `Hired`).
+  3. Time-to-hire calculates exact durations in days between application creation and the transition to `Hired` recorded in `StageHistory`.
+  4. Recruiter productivity tracks real counts of reviews, interviews booked, and stage transitions performed by each team member.
+  5. **Zero-Mock Policy**: Empty organizations display honest zero values; no fictitious benchmarks or simulated graphs are rendered.
+- **Consequences**: High-performance, verifiable reports that accurately reflect database state at all times.
+
+---
+
+## ADR-016: Deterministic Baseline Fallback & Zero-Hallucination AI Decision Support
+- **Status**: Accepted
+- **Context**: Large language models (LLMs) used in recruitment risk hallucinating applicant credentials, fabricating match scores, or introducing biased automated rejection decisions. Furthermore, ATS deployments without paid API keys (Gemini, OpenAI) must never fail silently or generate fraudulent scores.
+- **Decision**:
+  1. AI match analysis serves strictly as **human-in-the-loop decision support**. The system NEVER automatically advances or rejects applicants based on AI output.
+  2. When an external AI provider (Gemini) is configured with an active API key:
+     - Prompts sanitize input text and encapsulate applicant data in `<candidate_data>` blocks to neutralize prompt injection attacks.
+     - Structured JSON schemas enforce strict outputs with tier ratings (`strong_match`, `potential_match`, `low_match`).
+  3. When NO external AI provider is configured:
+     - The service transparently executes a deterministic baseline calculation comparing job requirements and applicant skills.
+     - The response honestly reports a limitation notice: `"No external AI provider configured. Evaluated using deterministic skill/requirement overlap baseline."`
+  4. Scores are strictly grounded in demonstrable overlap math, ensuring zero score fabrication.
+- **Consequences**: Complete compliance with ethical AI requirements, robust prompt injection defenses, honest provider status reporting, and total resilience in uncredentialed environments.
+

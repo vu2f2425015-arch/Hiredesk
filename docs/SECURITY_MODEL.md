@@ -202,3 +202,32 @@ Client responses are generated through specialized transformations that:
 - If SMTP credentials are missing, system records `status: 'failed'` with code `SMTP_NOT_CONFIGURED` without masking failure or claiming delivery.
 - Standards-compliant RFC 5545 `.ics` iCalendar attachments use sanitized fields and stable UIDs without claiming direct Google/Microsoft OAuth integration.
 
+---
+
+## 10. Phase 8 Security & Isolation Controls (Talent Pool, Notifications, Analytics, AI)
+
+### 10.1 Talent Pool Isolation & Client Lockout
+- Talent Pool folders and candidate memberships represent proprietary internal agency sourcing intelligence.
+- All endpoints under `/api/talent-pool/*` require active recruiter authentication (`req.user.role in ['super_admin', 'manager', 'recruiter']`).
+- Client portal callers (`role === 'client'`) are categorically blocked with `403 Forbidden` (`FORBIDDEN`).
+- Every folder query and mutation is tenant-scoped by `organizationId`. Attempting to access, modify, or add candidates to a folder belonging to another organization yields a non-disclosing `404 Not Found` response.
+
+### 10.2 Notifications Confidentiality & Scoping
+- In-app notifications (`/api/notifications/*`) are scoped strictly to the authenticated caller's identity (`userProfileId: req.user.id`) and tenant (`organizationId: req.user.organizationId`).
+- Agency recruiters and managers receive notifications for application submissions, stage updates, client reviews, and interview activities.
+- Client portal users are strictly isolated: internal recruiter notes, internal discussions, and cross-client notifications never trigger client-facing notifications.
+- Notification mutation actions (`PATCH /:id/read`, `PATCH /read-all`) verify recipient ownership. Any attempt to mark another user's notifications as read returns a non-disclosing `404 Not Found`.
+- Idempotent deduplication keys (`eventKey`) ensure asynchronous workers or concurrent operations cannot flood user inboxes with duplicate notifications.
+
+### 10.3 Advanced Analytics Security & Live Query Integrity
+- Reporting endpoints (`/api/analytics/funnel`, `/time-to-hire`, `/sources`, `/productivity`, `/job-outcomes`) enforce multi-tenant isolation via `organizationId`.
+- Recruiter productivity metrics (`/api/analytics/productivity`) evaluate agency-wide recruiter actions and are restricted to internal staff; client portal users attempting access receive `403 Forbidden`.
+- **Zero-Mock Policy**: In accordance with system security and auditing standards, analytics never serve fabricated placeholder figures. Every metric, conversion rate, time-to-hire duration, and source percentage is derived via direct SQL/Prisma database aggregations.
+
+### 10.4 AI Recruiter Decision Support & Defense-in-Depth
+- AI evaluation and screening routes (`/api/ai-recruiter/*`) require internal agency credentials (`super_admin`, `manager`, `recruiter`). Client portal callers are denied with `403 Forbidden`.
+- Applications evaluated for AI screening must belong to the caller's organization; cross-tenant targets return `404 Not Found`.
+- **Prompt Injection Defense**: Untrusted text extracted from candidate resumes, portfolios, and notes is sanitized to strip prompt-override markers and strictly encapsulated inside `<candidate_data>` delimiters before passing to language models.
+- **Human-in-the-Loop & Zero-Hallucination Mandate**: AI evaluations are strictly advisory decision-support recommendations. Under no circumstances does the system auto-reject or auto-advance candidates based on AI outputs.
+- **Transparent Fallback**: When no external AI provider API key is configured, the system transparently evaluates candidates using a deterministic skill and requirement overlap model, accompanied by an explicit, honest disclosure notice.
+

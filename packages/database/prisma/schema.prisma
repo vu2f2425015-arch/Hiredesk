@@ -24,6 +24,8 @@ model Organization {
   interviewRequests   InterviewRequest[]
   interviews          Interview[]
   outboundCommunications OutboundCommunication[]
+  talentPoolFolders   TalentPoolFolder[]
+  notifications       Notification[]
 
   @@map("organizations")
 }
@@ -48,6 +50,7 @@ model UserProfile {
   interviewsAsInterviewer Interview[] @relation("InterviewerProfile")
   interviewsScheduled     Interview[] @relation("ScheduledByProfile")
   interviewHistories      InterviewHistory[]
+  notifications           Notification[]
 
   @@index([authUserId])
   @@index([organizationId])
@@ -135,9 +138,11 @@ model Candidate {
   resumes         Resume[]
   interviews      Interview[]
   outboundCommunications OutboundCommunication[]
+  folderMemberships   TalentPoolFolderMember[]
 
   @@unique([organizationId, normalizedEmail])
   @@index([organizationId])
+  @@index([organizationId, candidateCode])
   @@map("candidates")
 }
 
@@ -393,4 +398,58 @@ model OutboundCommunication {
   @@index([recipientEmail])
   @@index([status, createdAt])
   @@map("outbound_communications")
+}
+
+model TalentPoolFolder {
+  id             String                   @id @default(uuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  members        TalentPoolFolderMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("talent_pool_folders")
+}
+
+model TalentPoolFolderMember {
+  id          String           @id @default(uuid())
+  folderId    String
+  folder      TalentPoolFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate   Candidate        @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  addedAt     DateTime         @default(now())
+
+  @@unique([folderId, candidateId])
+  @@index([folderId])
+  @@index([candidateId])
+  @@map("talent_pool_folder_members")
+}
+
+model Notification {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           String
+  title          String
+  message        String
+  entityType     String?
+  entityId       String?
+  actionUrl      String?
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  eventKey       String?
+  metadata       Json         @default("{}")
+  createdAt      DateTime     @default(now())
+
+  @@unique([userId, eventKey])
+  @@index([organizationId, userId, isRead])
+  @@index([userId, createdAt])
+  @@index([organizationId, eventKey])
+  @@map("notifications")
 }

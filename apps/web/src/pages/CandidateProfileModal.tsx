@@ -11,6 +11,8 @@ import {
   RefreshCw,
   Send,
   Calendar,
+  Sparkles,
+  Cpu,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -19,6 +21,8 @@ import {
   updateApplicationNotes,
   transitionApplicationStage,
   fetchResumeDownloadUrl,
+  evaluateCandidateMatch,
+  AiRecruiterMatchEvaluation,
 } from '../lib/api';
 import { ApplicationStage, UserRole } from '@hiredesk/shared';
 
@@ -57,6 +61,25 @@ export function CandidateProfileModal({
   const [selectedTargetStage, setSelectedTargetStage] = useState<string>('');
   const [transitionReason, setTransitionReason] = useState<string>('');
   const [stageNotice, setStageNotice] = useState<string | null>(null);
+
+  // Phase 8C: AI Recruiter Decision Support state
+  const [aiEvaluation, setAiEvaluation] = useState<AiRecruiterMatchEvaluation | null>(null);
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const handleEvaluateAiMatch = async (appId: string) => {
+    if (!token || !appId) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const result = await evaluateCandidateMatch(token, { applicationId: appId });
+      setAiEvaluation(result);
+    } catch (err: any) {
+      setAiError(err.message || 'Failed to evaluate AI match');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const loadProfile = async () => {
     if (!token || !candidateId) return;
@@ -507,6 +530,190 @@ export function CandidateProfileModal({
                       </button>
                     </div>
                   </div>
+
+                  {/* Phase 8C: AI Recruiter Decision Support (Strictly Gated, Recruiter Only) */}
+                  {!isClient && (
+                    <div
+                      style={{
+                        padding: '1.25rem',
+                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%)',
+                        border: '1px solid rgba(99, 102, 241, 0.25)',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.85rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Sparkles size={18} color="var(--primary)" />
+                          <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>AI Recruiter Decision Support</span>
+                          {aiEvaluation && (
+                            <span
+                              style={{
+                                fontSize: '0.7rem',
+                                padding: '0.15rem 0.5rem',
+                                borderRadius: '4px',
+                                background: aiEvaluation.provider === 'google_gemini' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(255, 255, 255, 0.08)',
+                                color: aiEvaluation.provider === 'google_gemini' ? '#c084fc' : 'var(--text-muted)',
+                              }}
+                            >
+                              {aiEvaluation.provider === 'google_gemini' ? 'Google Gemini' : 'Deterministic Baseline'}
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => handleEvaluateAiMatch(activeApplication.id)}
+                          disabled={aiLoading}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            fontSize: '0.8rem',
+                            padding: '0.35rem 0.75rem',
+                          }}
+                        >
+                          {aiLoading ? <RefreshCw className="spin" size={14} /> : <Cpu size={14} />}
+                          <span>{aiEvaluation ? 'Re-Evaluate Fit' : 'Evaluate Job Fit'}</span>
+                        </button>
+                      </div>
+
+                      {aiError && (
+                        <div style={{ color: '#ef4444', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <AlertCircle size={14} /> {aiError}
+                        </div>
+                      )}
+
+                      {aiEvaluation ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                          {aiEvaluation.limitationNotice && (
+                            <div
+                              style={{
+                                padding: '0.5rem 0.75rem',
+                                background: 'rgba(245, 158, 11, 0.1)',
+                                border: '1px solid rgba(245, 158, 11, 0.25)',
+                                borderRadius: '6px',
+                                fontSize: '0.78rem',
+                                color: '#f59e0b',
+                              }}
+                            >
+                              {aiEvaluation.limitationNotice}
+                            </div>
+                          )}
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.75rem 1rem',
+                              background: 'rgba(0, 0, 0, 0.2)',
+                              borderRadius: '8px',
+                              border: '1px solid var(--border-subtle)',
+                              flexWrap: 'wrap',
+                              gap: '0.75rem',
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Match Classification</div>
+                              <span
+                                style={{
+                                  fontSize: '0.9rem',
+                                  fontWeight: 700,
+                                  color:
+                                    aiEvaluation.matchTier === 'Strong Fit'
+                                      ? '#10b981'
+                                      : aiEvaluation.matchTier === 'Moderate Fit'
+                                      ? '#3b82f6'
+                                      : aiEvaluation.matchTier === 'Growth Potential'
+                                      ? '#f59e0b'
+                                      : 'var(--text-muted)',
+                                }}
+                              >
+                                {aiEvaluation.matchTier}
+                              </span>
+                            </div>
+
+                            <div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Skill Overlap Ratio</div>
+                              <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>
+                                {Math.round(aiEvaluation.skillsMatch.overlapRatio * 100)}%
+                                <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '0.35rem' }}>
+                                  ({aiEvaluation.skillsMatch.matchedSkills.length} of {aiEvaluation.skillsMatch.totalRequiredSkillsCount} required)
+                                </span>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Experience Check</div>
+                              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: aiEvaluation.experienceMatch.meetsExperience ? '#10b981' : '#f59e0b' }}>
+                                {aiEvaluation.experienceMatch.meetsExperience ? 'Meets Baseline' : 'Experience Gap Identified'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                            <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '6px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#10b981', marginBottom: '0.4rem' }}>
+                                Matched Required Skills ({aiEvaluation.skillsMatch.matchedSkills.length})
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                {aiEvaluation.skillsMatch.matchedSkills.length > 0 ? (
+                                  aiEvaluation.skillsMatch.matchedSkills.map((sk) => (
+                                    <span key={sk} style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                                      {sk}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>No direct skill match</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.05)', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#f59e0b', marginBottom: '0.4rem' }}>
+                                Missing Target Skills ({aiEvaluation.skillsMatch.missingSkills.length})
+                              </div>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                {aiEvaluation.skillsMatch.missingSkills.length > 0 ? (
+                                  aiEvaluation.skillsMatch.missingSkills.map((sk) => (
+                                    <span key={sk} style={{ fontSize: '0.72rem', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                                      {sk}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span style={{ fontSize: '0.72rem', color: '#10b981' }}>All required skills verified</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {aiEvaluation.interviewFocusAreas.length > 0 && (
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', background: 'rgba(255, 255, 255, 0.02)', padding: '0.65rem 0.85rem', borderRadius: '6px' }}>
+                              <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '0.25rem' }}>
+                                Recommended Interview Probing Areas:
+                              </strong>
+                              <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-muted)' }}>
+                                {aiEvaluation.interviewFocusAreas.map((focus, i) => (
+                                  <li key={i}>{focus}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '0.4rem' }}>
+                            {aiEvaluation.decisionSupportDisclaimer}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                          Click "Evaluate Job Fit" to calculate deterministic skill overlap and qualitative decision support for this position.
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Notes & Feedback Section with Strict Role Separation */}
                   <div style={{ display: 'grid', gridTemplateColumns: isClient ? '1fr' : '1fr 1fr', gap: '1rem' }}>

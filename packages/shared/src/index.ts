@@ -6,4 +6,6 @@ export * from './schemas/inbound.js';
 export * from './schemas/analytics.js';
 export * from './schemas/clientPortal.js';
 export * from './schemas/interview.js';
-
+export * from './schemas/talentPool.js';
+export * from './schemas/notification.js';
+export * from './schemas/aiRecruiter.js';

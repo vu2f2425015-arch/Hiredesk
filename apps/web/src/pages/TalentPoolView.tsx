@@ -1,0 +1,1084 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Users,
+  Search,
+  FolderPlus,
+  Folder,
+  Tag,
+  Briefcase,
+  ExternalLink,
+  Plus,
+  X,
+  AlertCircle,
+  RefreshCw,
+  Clock,
+  MapPin,
+  Mail,
+  Phone,
+  Trash2,
+  Edit2,
+  Filter,
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import {
+  TalentPoolCandidate,
+  TalentPoolFolder,
+  TalentPoolQuery,
+  fetchTalentPoolCandidates,
+  fetchTalentPoolFolders,
+  createTalentPoolFolder,
+  updateTalentPoolFolder,
+  deleteTalentPoolFolder,
+  addCandidateToFolder,
+  removeCandidateFromFolder,
+  associateCandidateWithJob,
+  fetchJobs,
+  ApiJob,
+} from '../lib/api';
+import { ApplicationStage, UserRole, JobStatus } from '@hiredesk/shared';
+import { CandidateProfileModal } from './CandidateProfileModal';
+
+export function TalentPoolView() {
+  const { session, profile } = useAuth();
+  const token = session?.access_token;
+  const isAuthorized = profile?.role && profile.role !== UserRole.CLIENT;
+
+  // Data state
+  const [candidates, setCandidates] = useState<TalentPoolCandidate[]>([]);
+  const [folders, setFolders] = useState<TalentPoolFolder[]>([]);
+  const [jobs, setJobs] = useState<ApiJob[]>([]);
+  const [totalCandidates, setTotalCandidates] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filters state
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [skillsTerm, setSkillsTerm] = useState<string>('');
+  const [selectedStage, setSelectedStage] = useState<string>('');
+  const [selectedFolderId, setSelectedFolderId] = useState<string>('');
+  const [locationTerm, setLocationTerm] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'lastAppliedAt'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Modals state
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
+  const [isCreateFolderOpen, setIsCreateFolderOpen] = useState<boolean>(false);
+  const [isEditFolderOpen, setIsEditFolderOpen] = useState<boolean>(false);
+  const [folderToEdit, setFolderToEdit] = useState<TalentPoolFolder | null>(null);
+  const [folderNameInput, setFolderNameInput] = useState<string>('');
+  const [folderDescInput, setFolderDescInput] = useState<string>('');
+  const [folderActionError, setFolderActionError] = useState<string | null>(null);
+
+  // Add candidate to folder modal
+  const [candidateForFolder, setCandidateForFolder] = useState<TalentPoolCandidate | null>(null);
+  const [targetFolderId, setTargetFolderId] = useState<string>('');
+
+  // Assign candidate to job modal
+  const [candidateForJob, setCandidateForJob] = useState<TalentPoolCandidate | null>(null);
+  const [targetJobId, setTargetJobId] = useState<string>('');
+  const [assignNotes, setAssignNotes] = useState<string>('');
+  const [assignSuccessMessage, setAssignSuccessMessage] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [submittingAssign, setSubmittingAssign] = useState<boolean>(false);
+
+  // Load Folders & Jobs
+  const loadMetadata = useCallback(async () => {
+    if (!token) return;
+    try {
+      const [foldersData, jobsData] = await Promise.all([
+        fetchTalentPoolFolders(token),
+        fetchJobs(token, { status: JobStatus.PUBLISHED, limit: 100 }),
+      ]);
+      setFolders(foldersData);
+      setJobs(jobsData.jobs);
+    } catch (err: any) {
+      console.error('Failed to load talent pool metadata:', err);
+    }
+  }, [token]);
+
+  // Load Candidates
+  const loadCandidates = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const query: TalentPoolQuery = {
+        page: currentPage,
+        limit: 15,
+        sortBy,
+        sortOrder,
+      };
+
+      if (searchTerm.trim()) query.search = searchTerm.trim();
+      if (skillsTerm.trim()) query.skills = skillsTerm.trim();
+      if (selectedStage) query.stage = selectedStage;
+      if (selectedFolderId) query.folderId = selectedFolderId;
+      if (locationTerm.trim()) query.location = locationTerm.trim();
+
+      const result = await fetchTalentPoolCandidates(token, query);
+      setCandidates(result.candidates);
+      setTotalCandidates(result.pagination.total);
+      setTotalPages(result.pagination.totalPages);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load candidates from talent pool');
+    } finally {
+      setLoading(false);
+    }
+  }, [token, currentPage, searchTerm, skillsTerm, selectedStage, selectedFolderId, locationTerm, sortBy, sortOrder]);
+
+  useEffect(() => {
+    if (token && isAuthorized) {
+      loadMetadata();
+    }
+  }, [token, isAuthorized, loadMetadata]);
+
+  useEffect(() => {
+    if (token && isAuthorized) {
+      loadCandidates();
+    }
+  }, [token, isAuthorized, loadCandidates]);
+
+  // Handlers for Folder operations
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !folderNameInput.trim()) return;
+    setFolderActionError(null);
+    try {
+      await createTalentPoolFolder(token, {
+        name: folderNameInput.trim(),
+        description: folderDescInput.trim() || undefined,
+      });
+      setFolderNameInput('');
+      setFolderDescInput('');
+      setIsCreateFolderOpen(false);
+      loadMetadata();
+    } catch (err: any) {
+      setFolderActionError(err.message || 'Failed to create folder');
+    }
+  };
+
+  const handleUpdateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !folderToEdit || !folderNameInput.trim()) return;
+    setFolderActionError(null);
+    try {
+      await updateTalentPoolFolder(token, folderToEdit.id, {
+        name: folderNameInput.trim(),
+        description: folderDescInput.trim() || undefined,
+      });
+      setFolderToEdit(null);
+      setIsEditFolderOpen(false);
+      loadMetadata();
+    } catch (err: any) {
+      setFolderActionError(err.message || 'Failed to update folder');
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string, folderName: string) => {
+    if (!token) return;
+    if (!window.confirm(`Delete folder "${folderName}"? Candidates will not be deleted.`)) return;
+    try {
+      await deleteTalentPoolFolder(token, folderId);
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId('');
+      }
+      loadMetadata();
+      loadCandidates();
+    } catch (err: any) {
+      alert(`Error deleting folder: ${err.message}`);
+    }
+  };
+
+  const handleAddCandidateToFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !candidateForFolder || !targetFolderId) return;
+    try {
+      await addCandidateToFolder(token, targetFolderId, candidateForFolder.id);
+      setCandidateForFolder(null);
+      setTargetFolderId('');
+      loadMetadata();
+      loadCandidates();
+    } catch (err: any) {
+      alert(`Failed to add candidate to folder: ${err.message}`);
+    }
+  };
+
+  const handleRemoveCandidateFromFolder = async (folderId: string, candidateId: string) => {
+    if (!token) return;
+    try {
+      await removeCandidateFromFolder(token, folderId, candidateId);
+      loadMetadata();
+      loadCandidates();
+    } catch (err: any) {
+      alert(`Failed to remove candidate from folder: ${err.message}`);
+    }
+  };
+
+  const handleAssignCandidateToJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !candidateForJob || !targetJobId) return;
+    setSubmittingAssign(true);
+    setAssignError(null);
+    setAssignSuccessMessage(null);
+    try {
+      const res = await associateCandidateWithJob(token, candidateForJob.id, {
+        jobId: targetJobId,
+        source: 'talent_pool',
+        recruiterNotes: assignNotes.trim() || undefined,
+      });
+      setAssignSuccessMessage(res.message);
+      loadCandidates();
+      setTimeout(() => {
+        setCandidateForJob(null);
+        setTargetJobId('');
+        setAssignNotes('');
+        setAssignSuccessMessage(null);
+      }, 1500);
+    } catch (err: any) {
+      setAssignError(err.message || 'Failed to assign candidate to job');
+    } finally {
+      setSubmittingAssign(false);
+    }
+  };
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setSkillsTerm('');
+    setSelectedStage('');
+    setSelectedFolderId('');
+    setLocationTerm('');
+    setCurrentPage(1);
+  };
+
+  if (!isAuthorized) {
+    return (
+      <div className="glass-card" style={{ maxWidth: 600, margin: '2rem auto', textAlign: 'center' }}>
+        <AlertCircle size={40} style={{ color: 'var(--danger)', margin: '0 auto 1rem' }} />
+        <h2>Access Restricted</h2>
+        <p style={{ color: 'var(--text-muted)' }}>
+          The Talent Pool is reserved for agency recruiters and hiring managers. Client users access candidate profiles exclusively through the Client Portal.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* Page Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', margin: 0, fontSize: '1.75rem' }}>
+            <Users style={{ color: 'var(--primary)' }} />
+            Talent Pool
+          </h1>
+          <p style={{ color: 'var(--text-muted)', margin: '0.35rem 0 0 0', fontSize: '0.9rem' }}>
+            Multi-job candidate database, tag categorizations, and talent redeployment across vacancies.
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.875rem' }}
+            onClick={() => {
+              setFolderNameInput('');
+              setFolderDescInput('');
+              setFolderActionError(null);
+              setIsCreateFolderOpen(true);
+            }}
+          >
+            <FolderPlus size={16} /> New Folder
+          </button>
+        </div>
+      </div>
+
+      {/* Folders Bar */}
+      <div
+        className="glass-card"
+        style={{
+          padding: '0.75rem 1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          overflowX: 'auto',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-dim)', textTransform: 'uppercase' }}>
+          Folders:
+        </span>
+
+        <button
+          className={`btn ${selectedFolderId === '' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ padding: '0.35rem 0.75rem', fontSize: '0.825rem', borderRadius: 'var(--radius-full)' }}
+          onClick={() => {
+            setSelectedFolderId('');
+            setCurrentPage(1);
+          }}
+        >
+          All Candidates ({totalCandidates})
+        </button>
+
+        {folders.map((folder) => {
+          const isSelected = selectedFolderId === folder.id;
+          return (
+            <div
+              key={folder.id}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.2rem 0.5rem 0.2rem 0.75rem',
+                borderRadius: 'var(--radius-full)',
+                background: isSelected ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
+                border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                color: isSelected ? '#fff' : 'var(--text-main)',
+                fontSize: '0.825rem',
+              }}
+            >
+              <span
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                onClick={() => {
+                  setSelectedFolderId(isSelected ? '' : folder.id);
+                  setCurrentPage(1);
+                }}
+              >
+                <Folder size={14} />
+                {folder.name} ({folder.candidateCount})
+              </span>
+
+              <button
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: isSelected ? '#fff' : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Edit folder"
+                onClick={() => {
+                  setFolderToEdit(folder);
+                  setFolderNameInput(folder.name);
+                  setFolderDescInput(folder.description || '');
+                  setFolderActionError(null);
+                  setIsEditFolderOpen(true);
+                }}
+              >
+                <Edit2 size={12} />
+              </button>
+
+              <button
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: isSelected ? '#fff' : 'var(--danger)',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+                title="Delete folder"
+                onClick={() => handleDeleteFolder(folder.id, folder.name)}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+          {/* Keyword Search */}
+          <div style={{ position: 'relative' }}>
+            <Search
+              size={16}
+              style={{
+                position: 'absolute',
+                left: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-dim)',
+              }}
+            />
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Search by name, email, code..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{ paddingLeft: '2.25rem' }}
+            />
+          </div>
+
+          {/* Skills Filter */}
+          <div style={{ position: 'relative' }}>
+            <Tag
+              size={16}
+              style={{
+                position: 'absolute',
+                left: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-dim)',
+              }}
+            />
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Skills (e.g. React, Python)..."
+              value={skillsTerm}
+              onChange={(e) => {
+                setSkillsTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{ paddingLeft: '2.25rem' }}
+            />
+          </div>
+
+          {/* Application Stage Filter */}
+          <div>
+            <select
+              className="input-field"
+              value={selectedStage}
+              onChange={(e) => {
+                setSelectedStage(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="">All Application Stages</option>
+              {Object.values(ApplicationStage).map((stage) => (
+                <option key={stage} value={stage}>
+                  Stage: {stage}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Location Filter */}
+          <div style={{ position: 'relative' }}>
+            <MapPin
+              size={16}
+              style={{
+                position: 'absolute',
+                left: '0.75rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-dim)',
+              }}
+            />
+            <input
+              type="text"
+              className="input-field"
+              placeholder="City, State, Country..."
+              value={locationTerm}
+              onChange={(e) => {
+                setLocationTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              style={{ paddingLeft: '2.25rem' }}
+            />
+          </div>
+        </div>
+
+        {/* Second Row: Sorting & Reset */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            <Filter size={14} />
+            <span>Sort by:</span>
+            <select
+              className="input-field"
+              style={{ width: 'auto', padding: '0.25rem 0.5rem', fontSize: '0.825rem' }}
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+            >
+              <option value="createdAt">Date Created</option>
+              <option value="name">Candidate Name</option>
+              <option value="lastAppliedAt">Recent Application</option>
+            </select>
+
+            <select
+              className="input-field"
+              style={{ width: 'auto', padding: '0.25rem 0.5rem', fontSize: '0.825rem' }}
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as any)}
+            >
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {(searchTerm || skillsTerm || selectedStage || selectedFolderId || locationTerm) && (
+              <button
+                className="btn btn-secondary"
+                style={{ padding: '0.25rem 0.65rem', fontSize: '0.8rem' }}
+                onClick={resetFilters}
+              >
+                Clear Filters
+              </button>
+            )}
+
+            <button
+              className="btn btn-secondary"
+              style={{ padding: '0.25rem 0.65rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+              onClick={loadCandidates}
+              title="Refresh candidate list"
+            >
+              <RefreshCw size={13} className={loading ? 'spin' : ''} /> Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Error state */}
+      {error && (
+        <div
+          style={{
+            padding: '1rem',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+          }}
+        >
+          <AlertCircle size={18} />
+          <span>{error}</span>
+          <button className="btn btn-secondary" style={{ marginLeft: 'auto', padding: '0.25rem 0.5rem', fontSize: '0.8rem' }} onClick={loadCandidates}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* Candidates List / Table */}
+      {loading ? (
+        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <RefreshCw size={24} className="spin" style={{ margin: '0 auto 1rem', display: 'block' }} />
+          Loading talent pool candidates from database...
+        </div>
+      ) : candidates.length === 0 ? (
+        <div className="glass-card" style={{ padding: '3.5rem 2rem', textAlign: 'center' }}>
+          <Users size={48} style={{ color: 'var(--text-dim)', margin: '0 auto 1rem' }} />
+          <h3 style={{ marginBottom: '0.5rem' }}>No Candidates Found</h3>
+          <p style={{ color: 'var(--text-muted)', maxWidth: 500, margin: '0 auto 1.5rem', fontSize: '0.9rem' }}>
+            {searchTerm || skillsTerm || selectedStage || selectedFolderId || locationTerm
+              ? 'No candidates in the database matched your active search filters. Try clearing or relaxing filter criteria.'
+              : 'There are no candidate records in your agency talent pool yet. Candidates are automatically added when applications are submitted through careers pages or received via email.'}
+          </p>
+          {(searchTerm || skillsTerm || selectedStage || selectedFolderId || locationTerm) && (
+            <button className="btn btn-secondary" onClick={resetFilters}>
+              Reset Filters
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {candidates.map((candidate) => (
+            <div
+              key={candidate.id}
+              className="glass-card"
+              style={{
+                padding: '1.25rem',
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                gap: '1.25rem',
+                alignItems: 'start',
+              }}
+            >
+              {/* Left Column: Candidate Info */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                {/* Header Row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.75rem',
+                      padding: '0.2rem 0.5rem',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      color: 'var(--primary)',
+                      borderRadius: '4px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {candidate.candidateCode}
+                  </span>
+
+                  <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>{candidate.name}</h3>
+
+                  {candidate.location && (
+                    <span style={{ fontSize: '0.825rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <MapPin size={13} /> {candidate.location}
+                      {candidate.country ? `, ${candidate.country}` : ''}
+                    </span>
+                  )}
+                </div>
+
+                {/* Contact Row */}
+                <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Mail size={14} style={{ color: 'var(--text-dim)' }} /> {candidate.email}
+                  </span>
+                  {candidate.phone && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Phone size={14} style={{ color: 'var(--text-dim)' }} /> {candidate.phone}
+                    </span>
+                  )}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Clock size={14} style={{ color: 'var(--text-dim)' }} /> Added {new Date(candidate.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+
+                {/* Skills Row */}
+                {candidate.skills && candidate.skills.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.15rem' }}>
+                    {candidate.skills.map((skill, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '0.15rem 0.5rem',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          borderRadius: '4px',
+                          color: 'var(--text-muted)',
+                          border: '1px solid var(--border-subtle)',
+                        }}
+                      >
+                        {skill}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Applications Summary */}
+                <div style={{ marginTop: '0.35rem', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-dim)', fontWeight: 500, marginRight: '0.5rem' }}>
+                    Applications ({candidate.totalApplications}):
+                  </span>
+                  {candidate.applications.length === 0 ? (
+                    <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No active applications</span>
+                  ) : (
+                    <div style={{ display: 'inline-flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.25rem' }}>
+                      {candidate.applications.map((app) => (
+                        <span
+                          key={app.id}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.55rem',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-subtle)',
+                            fontSize: '0.775rem',
+                          }}
+                        >
+                          <Briefcase size={12} style={{ color: 'var(--text-dim)' }} />
+                          <strong>{app.jobCode}</strong> - {app.jobTitle} ({app.clientName})
+                          <span
+                            style={{
+                              marginLeft: '0.25rem',
+                              padding: '0.1rem 0.35rem',
+                              borderRadius: '3px',
+                              fontSize: '0.7rem',
+                              background: 'rgba(59, 130, 246, 0.15)',
+                              color: 'var(--primary)',
+                              fontWeight: 600,
+                            }}
+                          >
+                            {app.stage}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Folders row */}
+                {candidate.folders && candidate.folders.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Folders:</span>
+                    {candidate.folders.map((f) => (
+                      <span
+                        key={f.id}
+                        style={{
+                          fontSize: '0.725rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '0.15rem 0.45rem',
+                          background: 'rgba(16, 185, 129, 0.1)',
+                          color: '#34d399',
+                          borderRadius: 'var(--radius-full)',
+                        }}
+                      >
+                        <Folder size={11} /> {f.name}
+                        <button
+                          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, display: 'flex' }}
+                          title="Remove from folder"
+                          onClick={() => handleRemoveCandidateFromFolder(f.id, candidate.id)}
+                        >
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Column: Actions */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minWidth: 140 }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: '100%', fontSize: '0.825rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  onClick={() => setSelectedCandidateId(candidate.id)}
+                >
+                  <ExternalLink size={14} /> View Profile
+                </button>
+
+                <button
+                  className="btn btn-primary"
+                  style={{ width: '100%', fontSize: '0.825rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  onClick={() => {
+                    setCandidateForJob(candidate);
+                    setTargetJobId('');
+                    setAssignNotes('');
+                    setAssignError(null);
+                    setAssignSuccessMessage(null);
+                  }}
+                >
+                  <Briefcase size={14} /> Assign to Job
+                </button>
+
+                <button
+                  className="btn btn-secondary"
+                  style={{ width: '100%', fontSize: '0.825rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  onClick={() => {
+                    setCandidateForFolder(candidate);
+                    setTargetFolderId(folders[0]?.id || '');
+                  }}
+                >
+                  <Plus size={14} /> Add to Folder
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+              <button
+                className="btn btn-secondary"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+              >
+                Previous
+              </button>
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                Page {currentPage} of {totalPages} ({totalCandidates} candidates)
+              </span>
+              <button
+                className="btn btn-secondary"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==================================================================== */}
+      {/* Modals */}
+      {/* ==================================================================== */}
+
+      {/* Candidate Profile Modal */}
+      {selectedCandidateId && (
+        <CandidateProfileModal
+          candidateId={selectedCandidateId}
+          onClose={() => setSelectedCandidateId(null)}
+          onApplicationUpdated={() => {
+            loadCandidates();
+          }}
+        />
+      )}
+
+      {/* Create Folder Modal */}
+      {isCreateFolderOpen && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: 450 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FolderPlus style={{ color: 'var(--primary)' }} /> Create Talent Folder
+              </h3>
+              <button className="btn-icon" onClick={() => setIsCreateFolderOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {folderActionError && (
+              <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                {folderActionError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateFolder}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
+                    Folder Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="input-field"
+                    placeholder="e.g. Senior Frontend, React Leads, Executive"
+                    value={folderNameInput}
+                    onChange={(e) => setFolderNameInput(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
+                    Description (optional)
+                  </label>
+                  <textarea
+                    className="input-field"
+                    rows={3}
+                    placeholder="Describe the candidate category or purpose of this folder..."
+                    value={folderDescInput}
+                    onChange={(e) => setFolderDescInput(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setIsCreateFolderOpen(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={!folderNameInput.trim()}>
+                    Create Folder
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Folder Modal */}
+      {isEditFolderOpen && folderToEdit && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: 450 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Edit2 style={{ color: 'var(--primary)' }} /> Edit Folder
+              </h3>
+              <button className="btn-icon" onClick={() => setIsEditFolderOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            {folderActionError && (
+              <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                {folderActionError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateFolder}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
+                    Folder Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    className="input-field"
+                    value={folderNameInput}
+                    onChange={(e) => setFolderNameInput(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
+                    Description
+                  </label>
+                  <textarea
+                    className="input-field"
+                    rows={3}
+                    value={folderDescInput}
+                    onChange={(e) => setFolderDescInput(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setIsEditFolderOpen(false)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={!folderNameInput.trim()}>
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Candidate to Folder Modal */}
+      {candidateForFolder && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: 450 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FolderPlus style={{ color: 'var(--primary)' }} /> Add to Folder
+              </h3>
+              <button className="btn-icon" onClick={() => setCandidateForFolder(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Add <strong>{candidateForFolder.name}</strong> ({candidateForFolder.candidateCode}) to an agency folder:
+            </p>
+
+            {folders.length === 0 ? (
+              <div>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                  No folders created yet. Please create a folder first.
+                </p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                  <button className="btn btn-secondary" onClick={() => setCandidateForFolder(null)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleAddCandidateToFolder}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
+                      Select Folder *
+                    </label>
+                    <select
+                      className="input-field"
+                      required
+                      value={targetFolderId}
+                      onChange={(e) => setTargetFolderId(e.target.value)}
+                    >
+                      <option value="">-- Choose a Folder --</option>
+                      {folders.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name} ({f.candidateCount} candidates)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setCandidateForFolder(null)}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary" disabled={!targetFolderId}>
+                      Add to Folder
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Assign Candidate to Job Modal */}
+      {candidateForJob && (
+        <div className="modal-backdrop">
+          <div className="modal-content" style={{ maxWidth: 500 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Briefcase style={{ color: 'var(--primary)' }} /> Assign to Open Job
+              </h3>
+              <button className="btn-icon" onClick={() => setCandidateForJob(null)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Create a new application for <strong>{candidateForJob.name}</strong> ({candidateForJob.candidateCode}) for a vacancy in your agency:
+            </p>
+
+            {assignSuccessMessage && (
+              <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                {assignSuccessMessage}
+              </div>
+            )}
+
+            {assignError && (
+              <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+                {assignError}
+              </div>
+            )}
+
+            <form onSubmit={handleAssignCandidateToJob}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
+                    Select Target Job *
+                  </label>
+                  <select
+                    className="input-field"
+                    required
+                    value={targetJobId}
+                    onChange={(e) => setTargetJobId(e.target.value)}
+                  >
+                    <option value="">-- Choose an active vacancy --</option>
+                    {jobs.map((job) => (
+                      <option key={job.id} value={job.id}>
+                        [{job.jobCode}] {job.title} - {job.client?.name || 'Client'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
+                    Internal Recruiter Notes (optional)
+                  </label>
+                  <textarea
+                    className="input-field"
+                    rows={3}
+                    placeholder="Add rationale, matching criteria or recruiter context..."
+                    value={assignNotes}
+                    onChange={(e) => setAssignNotes(e.target.value)}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setCandidateForJob(null)} disabled={submittingAssign}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={!targetJobId || submittingAssign}>
+                    {submittingAssign ? 'Assigning...' : 'Assign Candidate'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1188,3 +1188,531 @@ export async function fetchClientScheduledInterview(token: string, id: string): 
   return json.data;
 }
 
+// ============================================================================
+// Phase 8A: Talent Pool & Folders Client API
+// ============================================================================
+
+export interface TalentPoolCandidateApplication {
+  id: string;
+  jobId: string;
+  jobCode: string;
+  jobTitle: string;
+  clientId: string;
+  clientName: string;
+  stage: string;
+  source: string;
+  appliedAt: string;
+  recruiterNotes?: string;
+  clientFeedback?: string;
+}
+
+export interface TalentPoolCandidate {
+  id: string;
+  candidateCode: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  location: string | null;
+  country: string | null;
+  skills: string[];
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  totalApplications: number;
+  lastAppliedAt: string | null;
+  lastStage: string | null;
+  folders: Array<{ id: string; name: string }>;
+  applications: TalentPoolCandidateApplication[];
+  resumeCount: number;
+}
+
+export interface TalentPoolFolder {
+  id: string;
+  name: string;
+  description: string | null;
+  candidateCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TalentPoolQuery {
+  search?: string;
+  skills?: string;
+  location?: string;
+  country?: string;
+  candidateCode?: string;
+  stage?: string;
+  jobId?: string;
+  jobCode?: string;
+  source?: string;
+  folderId?: string;
+  appliedAfter?: string;
+  appliedBefore?: string;
+  sortBy?: 'createdAt' | 'name' | 'lastAppliedAt';
+  sortOrder?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+export async function fetchTalentPoolCandidates(
+  token: string,
+  query?: TalentPoolQuery
+): Promise<{
+  candidates: TalentPoolCandidate[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}> {
+  const params = new URLSearchParams();
+  if (query?.search) params.set('search', query.search);
+  if (query?.skills) params.set('skills', query.skills);
+  if (query?.location) params.set('location', query.location);
+  if (query?.country) params.set('country', query.country);
+  if (query?.candidateCode) params.set('candidateCode', query.candidateCode);
+  if (query?.stage) params.set('stage', query.stage);
+  if (query?.jobId) params.set('jobId', query.jobId);
+  if (query?.jobCode) params.set('jobCode', query.jobCode);
+  if (query?.source) params.set('source', query.source);
+  if (query?.folderId) params.set('folderId', query.folderId);
+  if (query?.appliedAfter) params.set('appliedAfter', query.appliedAfter);
+  if (query?.appliedBefore) params.set('appliedBefore', query.appliedBefore);
+  if (query?.sortBy) params.set('sortBy', query.sortBy);
+  if (query?.sortOrder) params.set('sortOrder', query.sortOrder);
+  if (query?.page) params.set('page', String(query.page));
+  if (query?.limit) params.set('limit', String(query.limit));
+
+  const res = await fetch(`/api/talent-pool/candidates?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch talent pool candidates');
+  }
+  return json.data;
+}
+
+export async function fetchTalentPoolCandidate(token: string, candidateId: string): Promise<any> {
+  const res = await fetch(`/api/talent-pool/candidates/${candidateId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch candidate details');
+  }
+  return json.data;
+}
+
+export async function associateCandidateWithJob(
+  token: string,
+  candidateId: string,
+  payload: { jobId: string; source?: string; recruiterNotes?: string }
+): Promise<{ application: any; isExisting: boolean; message: string }> {
+  const res = await fetch(`/api/talent-pool/candidates/${candidateId}/applications`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to assign candidate to job');
+  }
+  return json.data;
+}
+
+export async function fetchTalentPoolFolders(token: string): Promise<TalentPoolFolder[]> {
+  const res = await fetch('/api/talent-pool/folders', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch talent pool folders');
+  }
+  return json.data;
+}
+
+export async function createTalentPoolFolder(
+  token: string,
+  payload: { name: string; description?: string }
+): Promise<TalentPoolFolder> {
+  const res = await fetch('/api/talent-pool/folders', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to create folder');
+  }
+  return json.data;
+}
+
+export async function updateTalentPoolFolder(
+  token: string,
+  folderId: string,
+  payload: { name?: string; description?: string }
+): Promise<TalentPoolFolder> {
+  const res = await fetch(`/api/talent-pool/folders/${folderId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to update folder');
+  }
+  return json.data;
+}
+
+export async function deleteTalentPoolFolder(token: string, folderId: string): Promise<{ success: boolean }> {
+  const res = await fetch(`/api/talent-pool/folders/${folderId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to delete folder');
+  }
+  return json.data;
+}
+
+export async function addCandidateToFolder(
+  token: string,
+  folderId: string,
+  candidateId: string
+): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`/api/talent-pool/folders/${folderId}/candidates`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ candidateId }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to add candidate to folder');
+  }
+  return json.data;
+}
+
+export async function removeCandidateFromFolder(
+  token: string,
+  folderId: string,
+  candidateId: string
+): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`/api/talent-pool/folders/${folderId}/candidates/${candidateId}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to remove candidate from folder');
+  }
+  return json.data;
+}
+
+// ============================================================================
+// Phase 8B: In-App Notifications & Advanced Reporting Client API
+// ============================================================================
+
+export interface InAppNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  actionUrl?: string | null;
+  isRead: boolean;
+  readAt?: string | null;
+  createdAt: string;
+  metadata?: Record<string, any>;
+}
+
+export interface NotificationListResult {
+  notifications: InAppNotification[];
+  unreadCount: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export async function fetchNotifications(
+  token: string,
+  query: { page?: number; limit?: number; unreadOnly?: boolean } = {}
+): Promise<NotificationListResult> {
+  const params = new URLSearchParams();
+  if (query.page) params.set('page', String(query.page));
+  if (query.limit) params.set('limit', String(query.limit));
+  if (query.unreadOnly) params.set('unreadOnly', 'true');
+
+  const res = await fetch(`/api/notifications?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to fetch notifications');
+  }
+  return json.data;
+}
+
+export async function fetchUnreadNotificationCount(token: string): Promise<number> {
+  const res = await fetch('/api/notifications/unread-count', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) return 0;
+  return json.data?.unreadCount || 0;
+}
+
+export async function markNotificationAsRead(token: string, notificationId: string): Promise<InAppNotification> {
+  const res = await fetch(`/api/notifications/${notificationId}/read`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to mark notification as read');
+  }
+  return json.data;
+}
+
+export async function markAllNotificationsAsRead(token: string): Promise<{ updatedCount: number }> {
+  const res = await fetch('/api/notifications/mark-all-read', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to mark all as read');
+  }
+  return json.data;
+}
+
+// ----------------------------------------------------------------------------
+// Advanced Reports
+// ----------------------------------------------------------------------------
+
+export interface FunnelStageMetric {
+  stage: string;
+  count: number;
+  conversionFromApplied: number;
+  conversionFromPrevious: number;
+}
+
+export interface FunnelReportData {
+  totalApplications: number;
+  stages: FunnelStageMetric[];
+  generatedAt: string;
+}
+
+export interface TimeToHireReportData {
+  totalHired: number;
+  averageDaysToHire: number;
+  medianDaysToHire: number;
+  fastestDaysToHire: number;
+  slowestDaysToHire: number;
+  stageAverages: Array<{
+    stage: string;
+    averageDaysInStage: number;
+  }>;
+}
+
+export interface CandidateSourceReportData {
+  totalApplications: number;
+  sources: Array<{
+    source: string;
+    count: number;
+    percentage: number;
+    hiredCount: number;
+  }>;
+}
+
+export interface RecruiterProductivityReportData {
+  period: {
+    startDate: string | null;
+    endDate: string | null;
+  };
+  recruiters: Array<{
+    recruiterId: string;
+    recruiterName: string;
+    email: string;
+    stageTransitionsCount: number;
+    interviewsScheduledCount: number;
+    notesLoggedCount: number;
+  }>;
+}
+
+export interface JobOutcomesReportData {
+  jobs: Array<{
+    jobId: string;
+    jobCode: string;
+    title: string;
+    clientName: string;
+    status: string;
+    totalApplications: number;
+    activeCount: number;
+    hiredCount: number;
+    rejectedCount: number;
+  }>;
+}
+
+export async function fetchFunnelReport(
+  token: string,
+  query: { jobId?: string; startDate?: string; endDate?: string } = {}
+): Promise<FunnelReportData> {
+  const params = new URLSearchParams();
+  if (query.jobId) params.set('jobId', query.jobId);
+  if (query.startDate) params.set('startDate', query.startDate);
+  if (query.endDate) params.set('endDate', query.endDate);
+
+  const res = await fetch(`/api/analytics/reports/funnel?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.error?.message || 'Failed to fetch funnel report');
+  return json.data;
+}
+
+export async function fetchTimeToHireReport(
+  token: string,
+  query: { jobId?: string; startDate?: string; endDate?: string } = {}
+): Promise<TimeToHireReportData> {
+  const params = new URLSearchParams();
+  if (query.jobId) params.set('jobId', query.jobId);
+  if (query.startDate) params.set('startDate', query.startDate);
+  if (query.endDate) params.set('endDate', query.endDate);
+
+  const res = await fetch(`/api/analytics/reports/time-to-hire?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.error?.message || 'Failed to fetch time-to-hire report');
+  return json.data;
+}
+
+export async function fetchCandidateSourcesReport(
+  token: string,
+  query: { jobId?: string; startDate?: string; endDate?: string } = {}
+): Promise<CandidateSourceReportData> {
+  const params = new URLSearchParams();
+  if (query.jobId) params.set('jobId', query.jobId);
+  if (query.startDate) params.set('startDate', query.startDate);
+  if (query.endDate) params.set('endDate', query.endDate);
+
+  const res = await fetch(`/api/analytics/reports/sources?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.error?.message || 'Failed to fetch sources report');
+  return json.data;
+}
+
+export async function fetchRecruiterProductivityReport(
+  token: string,
+  query: { startDate?: string; endDate?: string } = {}
+): Promise<RecruiterProductivityReportData> {
+  const params = new URLSearchParams();
+  if (query.startDate) params.set('startDate', query.startDate);
+  if (query.endDate) params.set('endDate', query.endDate);
+
+  const res = await fetch(`/api/analytics/reports/productivity?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.error?.message || 'Failed to fetch recruiter productivity');
+  return json.data;
+}
+
+export async function fetchJobOutcomesReport(
+  token: string,
+  query: { clientId?: string; jobId?: string } = {}
+): Promise<JobOutcomesReportData> {
+  const params = new URLSearchParams();
+  if (query.clientId) params.set('clientId', query.clientId);
+  if (query.jobId) params.set('jobId', query.jobId);
+
+  const res = await fetch(`/api/analytics/reports/jobs?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.error?.message || 'Failed to fetch job outcomes report');
+  return json.data;
+}
+
+// ============================================================================
+// Phase 8C: AI Recruiter Decision Support Client API
+// ============================================================================
+
+export interface AiRecruiterStatus {
+  providerConfigured: boolean;
+  providerName: 'deterministic_baseline' | 'google_gemini' | 'anthropic_claude' | 'openai';
+  model: string | null;
+  capabilities: string[];
+  message: string;
+}
+
+export interface AiRecruiterMatchEvaluation {
+  applicationId: string;
+  jobId: string;
+  candidateId: string;
+  provider: 'deterministic_baseline' | 'google_gemini' | 'anthropic_claude' | 'openai';
+  model: string | null;
+  promptVersion: string;
+  evaluatedAt: string;
+  limitationNotice?: string;
+  skillsMatch: {
+    matchedSkills: string[];
+    missingSkills: string[];
+    overlapRatio: number;
+    totalRequiredSkillsCount: number;
+    totalCandidateSkillsCount: number;
+  };
+  experienceMatch: {
+    requiredYears: number | null;
+    estimatedCandidateYears: number | null;
+    meetsExperience: boolean;
+  };
+  matchTier: 'Strong Fit' | 'Moderate Fit' | 'Growth Potential' | 'Low Overlap';
+  strengths: string[];
+  gaps: string[];
+  interviewFocusAreas: string[];
+  decisionSupportDisclaimer: string;
+}
+
+export async function fetchAiRecruiterStatus(token: string): Promise<AiRecruiterStatus> {
+  const res = await fetch('/api/ai-recruiter/status', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.error?.message || 'Failed to fetch AI Recruiter status');
+  return json.data;
+}
+
+export async function evaluateCandidateMatch(
+  token: string,
+  payload: { applicationId: string; jobId?: string }
+): Promise<AiRecruiterMatchEvaluation> {
+  const res = await fetch('/api/ai-recruiter/match', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.error?.message || 'Failed to evaluate candidate match');
+  return json.data;
+}
+

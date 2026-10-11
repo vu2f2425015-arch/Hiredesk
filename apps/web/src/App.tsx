@@ -10,6 +10,8 @@ import {
   LogOut,
   User as UserIcon,
   Calendar,
+  Users,
+  TrendingUp,
 } from 'lucide-react';
 import { UserRole } from '@hiredesk/shared';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -20,6 +22,9 @@ import { PublicCareerView } from './pages/PublicCareerView';
 import { UnmatchedApplicationsView } from './pages/UnmatchedApplicationsView';
 import { ClientPortalView } from './pages/ClientPortalView';
 import { InterviewsView } from './pages/InterviewsView';
+import { TalentPoolView } from './pages/TalentPoolView';
+import { ReportsView } from './pages/ReportsView';
+import { NotificationBell } from './components/NotificationBell';
 
 
 interface HealthResponse {
@@ -101,6 +106,12 @@ function AppShell() {
               <NavLink to="/interviews" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <Calendar size={16} /> Interviews
               </NavLink>
+              <NavLink to="/talent-pool" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Users size={16} /> Talent Pool
+              </NavLink>
+              <NavLink to="/reports" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <TrendingUp size={16} /> Reports
+              </NavLink>
               <NavLink to="/unmatched" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <Inbox size={16} /> Unmatched
               </NavLink>
@@ -125,6 +136,8 @@ function AppShell() {
               </span>
             )}
           </div>
+
+          {profile && !isClient && <NotificationBell />}
 
           {profile ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -180,6 +193,14 @@ function AppShell() {
           <Route
             path="/interviews"
             element={isClient ? <Navigate to="/client-portal" replace /> : <InterviewsView />}
+          />
+          <Route
+            path="/talent-pool"
+            element={isClient ? <Navigate to="/client-portal" replace /> : <TalentPoolView />}
+          />
+          <Route
+            path="/reports"
+            element={isClient ? <Navigate to="/client-portal" replace /> : <ReportsView />}
           />
           <Route path="/career/:orgSlug" element={<PublicCareerView />} />
           <Route path="/career/:orgSlug/:jobCode" element={<PublicCareerView />} />

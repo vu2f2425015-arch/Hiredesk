@@ -10,6 +10,8 @@ erDiagram
     Organization ||--o{ Candidate : tracks
     Organization ||--o{ InboundApplication : receives
     Organization ||--o{ ActivityLog : audits
+    Organization ||--o{ TalentPoolFolder : categorizes
+    Organization ||--o{ Notification : notifies
 
     Client ||--o{ Job : "assigned to"
     Client ||--o{ UserProfile : "scoped for client user"
@@ -17,6 +19,9 @@ erDiagram
     Job ||--o{ Application : receives
     Candidate ||--o{ Application : submits
     Candidate ||--o{ Resume : possesses
+    Candidate ||--o{ TalentPoolFolderMember : included_in
+    TalentPoolFolder ||--o{ TalentPoolFolderMember : contains
+    UserProfile ||--o{ Notification : receives
     Application ||--o{ Resume : links
     Application ||--o{ StageHistory : records
     Application ||--o{ InterviewRequest : receives
@@ -305,4 +310,43 @@ Durable outbound email outbox for interview invitations, calendar events, update
 - `createdAt`: Timestamp with time zone DEFAULT now()
 - `updatedAt`: Timestamp with time zone DEFAULT now()
 - **Indexes**: `(organizationId, status)`, `(interviewId)`, `(recipientEmail)`, `(createdAt)`
+
+### 3.15 TalentPoolFolder (Phase 8)
+Custom organization-scoped categorization folders for candidate rediscovery and sourcing.
+- `id`: UUID (Primary Key, default `gen_random_uuid()`)
+- `organizationId`: UUID NOT NULL (FK -> `Organization.id`, onDelete Cascade)
+- `name`: VarChar(100) NOT NULL
+- `description`: Text NULL
+- `color`: VarChar(30) NULL
+- `createdByUserProfileId`: UUID NULL (FK -> `UserProfile.id`, onDelete SetNull)
+- `createdAt`: Timestamp with time zone DEFAULT now()
+- `updatedAt`: Timestamp with time zone DEFAULT now()
+- **Indexes & Constraints**: `(organizationId, name)` UNIQUE, `(organizationId)`
+
+### 3.16 TalentPoolFolderMember (Phase 8)
+Junction table linking candidates to talent pool folders with recruiter curation notes.
+- `id`: UUID (Primary Key, default `gen_random_uuid()`)
+- `folderId`: UUID NOT NULL (FK -> `TalentPoolFolder.id`, onDelete Cascade)
+- `candidateId`: UUID NOT NULL (FK -> `Candidate.id`, onDelete Cascade)
+- `addedByUserProfileId`: UUID NULL (FK -> `UserProfile.id`, onDelete SetNull)
+- `notes`: Text NULL
+- `createdAt`: Timestamp with time zone DEFAULT now()
+- **Indexes & Constraints**: `(folderId, candidateId)` UNIQUE, `(candidateId)`
+
+### 3.17 Notification (Phase 8)
+In-app user notification entity supporting deduplication and action routing.
+- `id`: UUID (Primary Key, default `gen_random_uuid()`)
+- `organizationId`: UUID NOT NULL (FK -> `Organization.id`, onDelete Cascade)
+- `userProfileId`: UUID NOT NULL (FK -> `UserProfile.id`, onDelete Cascade)
+- `type`: VarChar(50) NOT NULL (`application_received`, `stage_changed`, `client_feedback_submitted`, `interview_scheduled`, `interview_cancelled`, `system_alert`)
+- `title`: VarChar(255) NOT NULL
+- `message`: Text NOT NULL
+- `read`: Boolean DEFAULT false
+- `readAt`: Timestamp with time zone NULL
+- `entityType`: VarChar(50) NULL (`application`, `candidate`, `job`, `interview`)
+- `entityId`: VarChar(100) NULL
+- `actionUrl`: VarChar(500) NULL
+- `eventKey`: VarChar(255) NULL (Idempotency deduplication key)
+- `createdAt`: Timestamp with time zone DEFAULT now()
+- **Indexes & Constraints**: `(userProfileId, read)`, `(organizationId, createdAt)`, `(eventKey)` UNIQUE (partial index WHERE `eventKey` IS NOT NULL)
 
