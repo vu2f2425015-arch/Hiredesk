@@ -20,7 +20,7 @@ build/
 coverage/
 .nyc_output/
 
-# Logs & Temporary files
+# Logs & Temporary files & Backups
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -28,6 +28,9 @@ yarn-error.log*
 pino-*.log
 .temp/
 tmp/
+backups/
+*.sql
+*.gpg
 
 # Editor & System
 .vscode/
