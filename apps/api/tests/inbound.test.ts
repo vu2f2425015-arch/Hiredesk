@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { setTokenVerifier, resetTokenVerifier } from '../src/services/auth.js';
+import { clearProfileCache } from '../src/middleware/auth.js';
 import { UserRole, InboundStatus, JobStatus } from '@hiredesk/shared';
 
 // Mock the @hiredesk/database module
@@ -105,6 +106,7 @@ describe('Inbound Applications Queue & Manual Assignment API', () => {
 
   beforeEach(() => {
     resetTokenVerifier();
+    clearProfileCache();
     vi.clearAllMocks();
 
     setTokenVerifier(async (token: string) => {

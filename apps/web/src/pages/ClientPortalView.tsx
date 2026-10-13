@@ -449,25 +449,14 @@ export function ClientPortalView() {
             </div>
 
             {/* Job Search Input */}
-            <div style={{ position: 'relative' }}>
-              <Search
-                size={14}
-                style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }}
-              />
+            <div className="search-box-wrapper" style={{ width: '100%', marginBottom: '0.75rem' }}>
+              <Search size={14} />
               <input
                 type="text"
+                className="input"
                 placeholder="Search vacancies by title or code..."
                 value={jobSearch}
                 onChange={(e) => setJobSearch(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem 0.75rem 0.5rem 2.2rem',
-                  background: 'var(--bg-input)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-sm)',
-                  color: '#fff',
-                  fontSize: '0.85rem',
-                }}
               />
             </div>
 

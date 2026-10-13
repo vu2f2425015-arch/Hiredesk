@@ -395,6 +395,59 @@ export function PublicCareerView() {
           ))}
         </div>
       )}
+
+      {/* Expandable Applicant FAQ Section */}
+      <section
+        style={{
+          marginTop: '2.5rem',
+          padding: '1.5rem',
+          background: 'var(--bg-card)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--border-subtle)',
+        }}
+        aria-labelledby="career-faq-title"
+      >
+        <h3 id="career-faq-title" style={{ fontSize: '1.15rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          Frequently Asked Questions
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <details style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+            <summary style={{ fontWeight: 600, cursor: 'pointer', outline: 'none', color: 'var(--text-main)' }}>
+              Can I apply by email instead of using this web form?
+            </summary>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Yes! You can email your resume directly to our agency's recruitment inbox. Include the exact Job Code (e.g. JOB-1001) in your email subject line, and our automated intake system will link your resume directly to this vacancy.
+            </p>
+          </details>
+
+          <details style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+            <summary style={{ fontWeight: 600, cursor: 'pointer', outline: 'none', color: 'var(--text-main)' }}>
+              What file formats and sizes are supported for resumes?
+            </summary>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              We accept PDF, DOCX, and DOC files up to 10 MB. Resumes are stored in private cloud storage and accessed only by authenticated recruiters.
+            </p>
+          </details>
+
+          <details style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+            <summary style={{ fontWeight: 600, cursor: 'pointer', outline: 'none', color: 'var(--text-main)' }}>
+              What happens if I submit my application multiple times?
+            </summary>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Our system utilizes idempotent deduplication. If you apply for the same vacancy with the same email, your existing application is safely preserved without creating duplicate records or re-uploading duplicate files.
+            </p>
+          </details>
+
+          <details style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+            <summary style={{ fontWeight: 600, cursor: 'pointer', outline: 'none', color: 'var(--text-main)' }}>
+              How will I be contacted for interviews?
+            </summary>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Shortlisted candidates will receive interview invitations via email complete with calendar attachments (RFC 5545 .ics) and direct meeting links.
+            </p>
+          </details>
+        </div>
+      </section>
     </div>
   );
 }

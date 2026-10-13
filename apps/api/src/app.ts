@@ -9,6 +9,7 @@ import { requestIdMiddleware } from './middleware/requestId.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { healthRouter } from './routes/health.js';
 import { meRouter } from './routes/me.js';
+import { authRouter } from './routes/auth.js';
 import { bootstrapRouter } from './routes/bootstrap.js';
 import { adminRouter } from './routes/admin.js';
 import { jobsRouter } from './routes/jobs.js';
@@ -36,6 +37,18 @@ export function createApp(): Express {
   app.use(express.json({ limit: '2mb' }));
   app.use(requestIdMiddleware);
 
+  // Cache Control Middleware: Protect multi-tenant isolation by marking private data as non-cacheable
+  app.use((req, res, next) => {
+    if ((req.path.startsWith('/career/') || req.path.startsWith('/api/career/')) && req.method === 'GET') {
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+    } else {
+      res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+    next();
+  });
+
   // Request Logging
   if (config.NODE_ENV !== 'test') {
     app.use(
@@ -49,6 +62,7 @@ export function createApp(): Express {
   // Mount Routes
   app.use(healthRouter);
   app.use('/api', healthRouter);
+  app.use('/api', authRouter);
   app.use('/api', meRouter);
   app.use('/api', bootstrapRouter);
   app.use('/api', adminRouter);

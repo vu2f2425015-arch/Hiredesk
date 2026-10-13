@@ -14,7 +14,31 @@ import {
 } from '@hiredesk/shared';
 import { AuthenticatedUser } from '../middleware/auth.js';
 
+interface CachedMetrics {
+  data: DashboardMetricsDto;
+  expiresAt: number;
+}
+
+const metricsCache = new Map<string, CachedMetrics>();
+const METRICS_CACHE_TTL_MS = 15 * 1000;
+
+export function invalidateMetricsCache(organizationId?: string): void {
+  if (!organizationId) {
+    metricsCache.clear();
+    return;
+  }
+  for (const key of metricsCache.keys()) {
+    if (key.includes(organizationId)) {
+      metricsCache.delete(key);
+    }
+  }
+}
+
 export class AnalyticsService {
+  static invalidateCache(organizationId?: string): void {
+    invalidateMetricsCache(organizationId);
+  }
+
   /**
    * Computes database-backed dashboard metrics scoped to caller tenant and client role.
    */
@@ -22,6 +46,12 @@ export class AnalyticsService {
     user: AuthenticatedUser,
     query: DashboardAnalyticsQueryInput = {}
   ): Promise<DashboardMetricsDto> {
+    const cacheKey = `${user.role}:${user.organizationId || 'super'}:${user.clientId || 'none'}:${query.organizationId || 'all'}`;
+    const cached = metricsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const fourteenDaysAhead = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
@@ -68,45 +98,59 @@ export class AnalyticsService {
       activityWhere.organizationId = user.organizationId;
     }
 
-    // 1. Job counts
+    // 1. Job status distribution counts (Batch 1: 4 count queries)
     const [totalJobs, publishedJobs, draftJobs, closedJobs] = await Promise.all([
       prisma.job.count({ where: jobWhere }),
       prisma.job.count({ where: { ...jobWhere, status: JobStatus.PUBLISHED } }),
-      user.role === UserRole.CLIENT ? 0 : prisma.job.count({ where: { ...jobWhere, status: JobStatus.DRAFT } }),
+      user.role === UserRole.CLIENT ? Promise.resolve(0) : prisma.job.count({ where: { ...jobWhere, status: JobStatus.DRAFT } }),
       prisma.job.count({ where: { ...jobWhere, status: JobStatus.CLOSED } }),
     ]);
 
-    // 2. Candidate counts
-    let totalCandidates = 0;
-    if (user.role === UserRole.CLIENT) {
-      // Distinct candidates who applied for this client's jobs
-      const groups = await prisma.application.groupBy({
-        by: ['candidateId'],
-        where: appWhere,
-      });
-      totalCandidates = groups.length;
-    } else {
-      // Distinct candidates in the organization
-      totalCandidates = await prisma.candidate.count({ where: candidateWhere });
-    }
-
-    // 3. Application counts
-    const [totalApplications, recentApplicationsCount] = await Promise.all([
+    // 2. Candidate & Application volume counts (Batch 2: 3 count/group queries)
+    const [totalCandidates, totalApplications, recentApplicationsCount] = await Promise.all([
+      user.role === UserRole.CLIENT
+        ? prisma.application.groupBy({ by: ['candidateId'], where: appWhere }).then((g) => g.length)
+        : prisma.candidate.count({ where: candidateWhere }),
       prisma.application.count({ where: appWhere }),
-      prisma.application.count({
-        where: {
-          ...appWhere,
-          appliedAt: { gte: sevenDaysAgo },
-        },
-      }),
+      prisma.application.count({ where: { ...appWhere, appliedAt: { gte: sevenDaysAgo } } }),
     ]);
 
-    // 4. Stage distribution counts
+    // 3. Stage breakdown grouping (Batch 3)
     const stageGroups = await prisma.application.groupBy({
       by: ['stage'],
       _count: { id: true },
       where: appWhere,
     });
+
+    // 4. Approaching deadlines and recent activity (Batch 4: 2 list queries with deterministic secondary sort & field selection)
+    const [deadlineJobs, recentActivityLogs] = await Promise.all([
+      prisma.job.findMany({
+        where: {
+          ...jobWhere,
+          status: JobStatus.PUBLISHED,
+          deadline: {
+            gte: now,
+            lte: fourteenDaysAhead,
+          },
+        },
+        orderBy: [{ deadline: 'asc' }, { id: 'asc' }],
+        take: 10,
+        select: {
+          id: true,
+          jobCode: true,
+          title: true,
+          deadline: true,
+          client: {
+            select: { name: true },
+          },
+        },
+      }),
+      prisma.activityLog.findMany({
+        where: activityWhere,
+        orderBy: [{ timestamp: 'desc' }, { id: 'desc' }],
+        take: 10,
+      }),
+    ]);
 
     const stageCounts: Record<string, number> = {
       [ApplicationStage.APPLIED]: 0,
@@ -127,25 +171,6 @@ export class AnalyticsService {
       }
     }
 
-    // 5. Jobs approaching deadline (next 14 days)
-    const deadlineJobs = await prisma.job.findMany({
-      where: {
-        ...jobWhere,
-        status: JobStatus.PUBLISHED,
-        deadline: {
-          gte: now,
-          lte: fourteenDaysAhead,
-        },
-      },
-      orderBy: { deadline: 'asc' },
-      take: 10,
-      include: {
-        client: {
-          select: { name: true },
-        },
-      },
-    });
-
     const jobsApproachingDeadline = deadlineJobs
       .filter((j) => j.deadline)
       .map((j) => {
@@ -163,13 +188,6 @@ export class AnalyticsService {
         };
       });
 
-    // 6. Recent activity (last 10 entries)
-    const recentActivityLogs = await prisma.activityLog.findMany({
-      where: activityWhere,
-      orderBy: { timestamp: 'desc' },
-      take: 10,
-    });
-
     const recentActivity = recentActivityLogs.map((a: any) => {
       const rawDate = a.timestamp || a.createdAt;
       const parsedDate = rawDate instanceof Date ? rawDate : (rawDate ? new Date(rawDate) : new Date());
@@ -186,7 +204,7 @@ export class AnalyticsService {
       };
     });
 
-    return {
+    const result: DashboardMetricsDto = {
       totalJobs,
       publishedJobs,
       draftJobs,
@@ -214,6 +232,13 @@ export class AnalyticsService {
       },
       stages: stageCounts,
     } as any;
+
+    metricsCache.set(cacheKey, {
+      data: result,
+      expiresAt: Date.now() + METRICS_CACHE_TTL_MS,
+    });
+
+    return result;
   }
 
   /**

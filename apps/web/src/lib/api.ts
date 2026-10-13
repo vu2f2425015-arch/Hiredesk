@@ -1,4 +1,4 @@
-import { CreateJobInput, UpdateJobInput, JobQueryInput, PublicJobDto } from '@hiredesk/shared';
+import { CreateJobInput, UpdateJobInput, JobQueryInput, PublicJobDto, RegisterUserInput } from '@hiredesk/shared';
 
 export interface ApiJob {
   id: string;
@@ -167,6 +167,59 @@ export async function fetchClientsForOrg(token: string, orgId: string): Promise<
   }
   return json.data.clients || [];
 }
+
+export async function createClientInOrg(
+  token: string,
+  data: { name: string; contactEmail: string; contactPhone?: string; organizationId?: string }
+): Promise<ClientOption> {
+  const res = await fetch('/api/admin/clients', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to create client');
+  }
+  return json.data;
+}
+
+export async function registerUser(input: RegisterUserInput): Promise<{
+  user: {
+    id: string;
+    authUserId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    fullName: string;
+    role: string;
+    organizationId: string;
+    organizationName: string;
+  };
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  defaultClientId: string;
+}> {
+  const res = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Registration failed');
+  }
+  return json.data;
+}
+
 
 export async function fetchPublicCareerJobs(orgSlug: string): Promise<{ organization: { name: string; slug: string }; jobs: PublicJobDto[] }> {
   const res = await fetch(`/api/career/${orgSlug}/jobs`);

@@ -5,7 +5,22 @@ declare global {
   var prismaGlobal: PrismaClient | undefined;
 }
 
-export const prisma = global.prismaGlobal || new PrismaClient();
+const rawDbUrl = process.env.DATABASE_URL;
+const configuredDbUrl = rawDbUrl && !rawDbUrl.includes('connection_limit=')
+  ? (rawDbUrl.includes('?') ? `${rawDbUrl}&connection_limit=5` : `${rawDbUrl}?connection_limit=5`)
+  : rawDbUrl;
+
+export const prisma =
+  global.prismaGlobal ||
+  new PrismaClient({
+    datasources: configuredDbUrl
+      ? {
+          db: {
+            url: configuredDbUrl,
+          },
+        }
+      : undefined,
+  });
 
 if (process.env.NODE_ENV !== 'production') {
   global.prismaGlobal = prisma;

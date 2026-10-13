@@ -32,21 +32,33 @@ import {
   ApiJob,
 } from '../lib/api';
 
+import { useDebounce } from '../hooks/useDebounce';
+
 export function InterviewsView() {
   const { session, profile } = useAuth();
   const token = session?.access_token;
+  const orgId = profile?.organizationId;
+  const interviewsCacheKey = orgId ? `hd_interviews_cache_${orgId}` : null;
 
-
-  const [interviews, setInterviews] = useState<ApiInterview[]>([]);
+  const [interviews, setInterviews] = useState<ApiInterview[]>(() => {
+    try {
+      if (!interviewsCacheKey) return [];
+      const cached = sessionStorage.getItem(interviewsCacheKey);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [pendingRequests, setPendingRequests] = useState<ApiPendingInterviewRequest[]>([]);
   const [interviewers, setInterviewers] = useState<ApiInterviewerOption[]>([]);
   const [jobs, setJobs] = useState<ApiJob[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(interviews.length === 0);
   const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const debouncedSearch = useDebounce(searchQuery, 250);
 
   // Modals state
   const [selectedInterview, setSelectedInterview] = useState<ApiInterview | null>(null);
@@ -109,13 +121,18 @@ export function InterviewsView() {
       const [intRes, reqRes, interviewerRes, jobsRes] = await Promise.all([
         fetchInterviews(token, {
           status: statusFilter !== 'all' ? statusFilter : undefined,
-          search: searchQuery || undefined,
+          search: debouncedSearch || undefined,
         }),
         fetchPendingInterviewRequests(token),
         fetchInterviewers(token),
         fetchJobs(token, { limit: 100 }),
       ]);
       setInterviews(intRes.interviews);
+      if (interviewsCacheKey) {
+        try {
+          sessionStorage.setItem(interviewsCacheKey, JSON.stringify(intRes.interviews));
+        } catch {}
+      }
       setPendingRequests(reqRes);
       setInterviewers(interviewerRes);
       setJobs(jobsRes.jobs);
@@ -124,7 +141,7 @@ export function InterviewsView() {
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter, searchQuery]);
+  }, [token, statusFilter, debouncedSearch]);
 
   useEffect(() => {
     loadData();
@@ -440,29 +457,34 @@ export function InterviewsView() {
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--text-muted)' }} />
+          <div className="search-box-wrapper" style={{ width: '260px' }}>
+            <Search size={15} />
             <input
               type="text"
               className="input"
               placeholder="Search candidate, job code..."
-              style={{ paddingLeft: '2rem', width: 240, fontSize: '0.85rem' }}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <button className="btn btn-secondary" onClick={loadData} title="Refresh">
-            <RefreshCw size={16} />
+          <button className="btn btn-secondary" onClick={loadData} title="Refresh" style={{ height: '38px', padding: '0 0.75rem' }}>
+            <RefreshCw size={15} className={loading ? 'pulse-dot' : ''} />
           </button>
         </div>
       </div>
 
-      {/* Interviews List Table */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-          <RefreshCw size={24} className="spin" style={{ marginBottom: '0.5rem' }} />
-          <div>Loading scheduled interviews...</div>
+      {loading && interviews.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '50%' }}>
+                <div className="skeleton" style={{ width: '45%', height: '16px' }} />
+                <div className="skeleton" style={{ width: '70%', height: '12px' }} />
+              </div>
+              <div className="skeleton" style={{ width: '80px', height: '26px' }} />
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div className="card" style={{ padding: '2rem', textAlign: 'center', color: '#ef4444' }}>

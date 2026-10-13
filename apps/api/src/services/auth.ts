@@ -21,8 +21,15 @@ if (config.SUPABASE_URL && (config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_
   });
 }
 
+interface CachedToken {
+  user: VerifiedAuthUser;
+  expiresAt: number;
+}
+const tokenCache = new Map<string, CachedToken>();
+const TOKEN_CACHE_TTL_MS = 60 * 1000;
+
 /**
- * Default production token verifier using Supabase Auth getUser() API.
+ * Default production token verifier using Supabase Auth getUser() API with in-memory caching.
  */
 const defaultVerifier: TokenVerifier = async (token: string): Promise<VerifiedAuthUser | null> => {
   if (!token || typeof token !== 'string') {
@@ -34,17 +41,34 @@ const defaultVerifier: TokenVerifier = async (token: string): Promise<VerifiedAu
     return null;
   }
 
+  // Check cache first to avoid remote network roundtrip on every HTTP request
+  const cached = tokenCache.get(token);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.user;
+  }
+
   if (supabaseClient) {
     try {
       const { data, error } = await supabaseClient.auth.getUser(token);
       if (error || !data.user) {
         logger.debug({ err: error?.message }, 'Supabase token verification failed');
+        tokenCache.delete(token);
         return null;
       }
-      return {
+      const verifiedUser: VerifiedAuthUser = {
         authUserId: data.user.id,
         email: data.user.email || '',
       };
+      tokenCache.set(token, {
+        user: verifiedUser,
+        expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
+      });
+      // Limit cache size
+      if (tokenCache.size > 1000) {
+        const oldestKey = tokenCache.keys().next().value;
+        if (oldestKey) tokenCache.delete(oldestKey);
+      }
+      return verifiedUser;
     } catch (err) {
       logger.error({ err }, 'Error during Supabase token verification');
       return null;
@@ -64,13 +88,20 @@ const defaultVerifier: TokenVerifier = async (token: string): Promise<VerifiedAu
 let activeVerifier: TokenVerifier = defaultVerifier;
 
 export function setTokenVerifier(verifier: TokenVerifier): void {
+  tokenCache.clear();
   activeVerifier = verifier;
 }
 
 export function resetTokenVerifier(): void {
+  tokenCache.clear();
   activeVerifier = defaultVerifier;
 }
 
 export async function verifyToken(token: string): Promise<VerifiedAuthUser | null> {
   return activeVerifier(token);
 }
+
+export function getSupabaseAdminClient(): SupabaseClient | null {
+  return supabaseClient;
+}
+

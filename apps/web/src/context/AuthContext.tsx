@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { UserRole } from '@hiredesk/shared';
+import { registerUser } from '../lib/api';
+
 
 export interface TrustedUserProfile {
   id: string;
@@ -37,6 +39,13 @@ interface AuthContextType {
   profileError: string | null;
   isConfigured: boolean;
   signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  signUp: (params: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    organizationName: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -137,6 +146,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (data.session) {
+      try {
+        sessionStorage.clear();
+      } catch {}
       setSession(data.session);
       setUser(data.user);
       await fetchProfile(data.session.access_token);
@@ -146,7 +158,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   };
 
+  const signUp = async (params: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    organizationName: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return {
+        success: false,
+        error: 'Supabase credentials are not configured in .env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+      };
+    }
+
+    setLoading(true);
+    setProfileError(null);
+
+    try {
+      // 1. Provision organization, client, and user profile on server
+      await registerUser(params);
+
+      try {
+        sessionStorage.clear();
+      } catch {}
+
+      // 2. Sign in with the newly created account
+      const loginRes = await signIn(params.email, params.password);
+      if (!loginRes.success) {
+        setLoading(false);
+        return {
+          success: false,
+          error: loginRes.error || 'Account created successfully, but automatic sign in failed. Please sign in manually.',
+        };
+      }
+
+      setLoading(false);
+      return { success: true };
+    } catch (err: any) {
+      setLoading(false);
+      const msg = err.message || 'Registration failed. Please try again.';
+      setProfileError(msg);
+      return { success: false, error: msg };
+    }
+  };
+
   const signOut = async (): Promise<void> => {
+    try {
+      sessionStorage.clear();
+    } catch {}
     if (supabase) {
       await supabase.auth.signOut();
     }
@@ -174,6 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profileError,
         isConfigured: isSupabaseConfigured,
         signIn,
+        signUp,
         signOut,
         refreshProfile,
       }}

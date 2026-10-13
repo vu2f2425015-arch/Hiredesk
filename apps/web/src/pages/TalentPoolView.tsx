@@ -20,6 +20,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   TalentPoolCandidate,
   TalentPoolFolder,
@@ -55,10 +56,13 @@ export function TalentPoolView() {
 
   // Filters state
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const debouncedSearch = useDebounce(searchTerm, 250);
   const [skillsTerm, setSkillsTerm] = useState<string>('');
+  const debouncedSkills = useDebounce(skillsTerm, 250);
   const [selectedStage, setSelectedStage] = useState<string>('');
   const [selectedFolderId, setSelectedFolderId] = useState<string>('');
   const [locationTerm, setLocationTerm] = useState<string>('');
+  const debouncedLocation = useDebounce(locationTerm, 250);
   const [sortBy, setSortBy] = useState<'createdAt' | 'name' | 'lastAppliedAt'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -111,11 +115,11 @@ export function TalentPoolView() {
         sortOrder,
       };
 
-      if (searchTerm.trim()) query.search = searchTerm.trim();
-      if (skillsTerm.trim()) query.skills = skillsTerm.trim();
+      if (debouncedSearch.trim()) query.search = debouncedSearch.trim();
+      if (debouncedSkills.trim()) query.skills = debouncedSkills.trim();
       if (selectedStage) query.stage = selectedStage;
       if (selectedFolderId) query.folderId = selectedFolderId;
-      if (locationTerm.trim()) query.location = locationTerm.trim();
+      if (debouncedLocation.trim()) query.location = debouncedLocation.trim();
 
       const result = await fetchTalentPoolCandidates(token, query);
       setCandidates(result.candidates);
@@ -126,7 +130,7 @@ export function TalentPoolView() {
     } finally {
       setLoading(false);
     }
-  }, [token, currentPage, searchTerm, skillsTerm, selectedStage, selectedFolderId, locationTerm, sortBy, sortOrder]);
+  }, [token, currentPage, debouncedSearch, debouncedSkills, selectedStage, selectedFolderId, debouncedLocation, sortBy, sortOrder]);
 
   useEffect(() => {
     if (token && isAuthorized) {
@@ -395,64 +399,45 @@ export function TalentPoolView() {
       <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
           {/* Keyword Search */}
-          <div style={{ position: 'relative' }}>
-            <Search
-              size={16}
-              style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-dim)',
-              }}
-            />
+          <div className="search-box-wrapper">
+            <Search size={15} />
             <input
               type="text"
-              className="input-field"
+              className="input"
               placeholder="Search by name, email, code..."
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              style={{ paddingLeft: '2.25rem' }}
             />
           </div>
 
           {/* Skills Filter */}
-          <div style={{ position: 'relative' }}>
-            <Tag
-              size={16}
-              style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-dim)',
-              }}
-            />
+          <div className="search-box-wrapper">
+            <Tag size={15} />
             <input
               type="text"
-              className="input-field"
+              className="input"
               placeholder="Skills (e.g. React, Python)..."
               value={skillsTerm}
               onChange={(e) => {
                 setSkillsTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              style={{ paddingLeft: '2.25rem' }}
             />
           </div>
 
           {/* Application Stage Filter */}
           <div>
             <select
-              className="input-field"
+              className="input"
               value={selectedStage}
               onChange={(e) => {
                 setSelectedStage(e.target.value);
                 setCurrentPage(1);
               }}
+              style={{ width: '100%', height: '38px' }}
             >
               <option value="">All Application Stages</option>
               {Object.values(ApplicationStage).map((stage) => (
@@ -464,27 +449,17 @@ export function TalentPoolView() {
           </div>
 
           {/* Location Filter */}
-          <div style={{ position: 'relative' }}>
-            <MapPin
-              size={16}
-              style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-dim)',
-              }}
-            />
+          <div className="search-box-wrapper">
+            <MapPin size={15} />
             <input
               type="text"
-              className="input-field"
+              className="input"
               placeholder="City, State, Country..."
               value={locationTerm}
               onChange={(e) => {
                 setLocationTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              style={{ paddingLeft: '2.25rem' }}
             />
           </div>
         </div>
@@ -562,10 +537,17 @@ export function TalentPoolView() {
       )}
 
       {/* Candidates List / Table */}
-      {loading ? (
-        <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-          <RefreshCw size={24} className="spin" style={{ margin: '0 auto 1rem', display: 'block' }} />
-          Loading talent pool candidates from database...
+      {loading && candidates.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="glass-card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '60%' }}>
+                <div className="skeleton" style={{ width: '40%', height: '18px' }} />
+                <div className="skeleton" style={{ width: '70%', height: '14px' }} />
+              </div>
+              <div className="skeleton" style={{ width: '90px', height: '30px' }} />
+            </div>
+          ))}
         </div>
       ) : candidates.length === 0 ? (
         <div className="glass-card" style={{ padding: '3.5rem 2rem', textAlign: 'center' }}>

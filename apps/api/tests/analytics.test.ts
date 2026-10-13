@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { setTokenVerifier, resetTokenVerifier } from '../src/services/auth.js';
+import { invalidateMetricsCache } from '../src/services/analytics.js';
+import { clearProfileCache } from '../src/middleware/auth.js';
 import { UserRole, JobStatus, ApplicationStage } from '@hiredesk/shared';
 
 // Mock the @hiredesk/database module
@@ -86,6 +88,8 @@ describe('Phase 5: Recruiter Dashboard Analytics API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetTokenVerifier();
+    clearProfileCache();
+    invalidateMetricsCache();
 
     setTokenVerifier(async (token: string) => {
       if (token === 'token-recruiter-a') return { authUserId: 'auth-recruiter-a', email: 'recruiter@apex.local' };

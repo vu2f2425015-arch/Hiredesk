@@ -52,8 +52,18 @@ export const CreateUserSchema = z.object({
   clientId: z.string().uuid().optional(),
 });
 
+export const RegisterUserSchema = z.object({
+  email: z.string().email({ message: 'Valid email address is required' }),
+  password: z.string().min(8, { message: 'Password must be at least 8 characters long' }),
+  firstName: z.string().min(1, { message: 'First name is required' }),
+  lastName: z.string().min(1, { message: 'Last name is required' }),
+  organizationName: z.string().min(2, { message: 'Agency or organization name is required' }),
+});
+
 export type UserProfileDto = z.infer<typeof UserProfileSchema>;
 export type BootstrapSuperAdminInput = z.infer<typeof BootstrapSuperAdminSchema>;
 export type CreateOrganizationInput = z.infer<typeof CreateOrganizationSchema>;
 export type CreateClientInput = z.infer<typeof CreateClientSchema>;
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
+export type RegisterUserInput = z.infer<typeof RegisterUserSchema>;
+

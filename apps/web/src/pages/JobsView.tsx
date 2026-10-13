@@ -25,6 +25,7 @@ import {
   reopenJob,
   duplicateJob,
   fetchClientsForOrg,
+  createClientInOrg,
   fetchJobApplications,
   fetchResumeDownloadUrl,
   ApplicationItem,
@@ -32,16 +33,29 @@ import {
 import { EmploymentType, JobStatus, WorkplaceModel, UserRole } from '@hiredesk/shared';
 import { JobPipelineView } from './JobPipelineView';
 import { CandidateProfileModal } from './CandidateProfileModal';
+import { useDebounce } from '../hooks/useDebounce';
 
 export function JobsView() {
   const { session, profile } = useAuth();
   const token = session?.access_token;
 
-  const [jobs, setJobs] = useState<ApiJob[]>([]);
+  const orgId = profile?.organizationId;
+  const jobsCacheKey = orgId ? `hd_jobs_cache_${orgId}` : null;
+
+  const [jobs, setJobs] = useState<ApiJob[]>(() => {
+    try {
+      if (!jobsCacheKey) return [];
+      const cached = sessionStorage.getItem(jobsCacheKey);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [clients, setClients] = useState<ClientOption[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(jobs.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
+  const debouncedSearch = useDebounce(search, 250);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<ApiJob | null>(null);
   const [pipelineJob, setPipelineJob] = useState<ApiJob | null>(null);
@@ -58,16 +72,21 @@ export function JobsView() {
     setError(null);
     try {
       const res = await fetchJobs(token, {
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         status: (statusFilter as JobStatus) || undefined,
       });
       setJobs(res.jobs);
+      if (jobsCacheKey) {
+        try {
+          sessionStorage.setItem(jobsCacheKey, JSON.stringify(res.jobs));
+        } catch {}
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load jobs');
     } finally {
       setLoading(false);
     }
-  }, [token, search, statusFilter]);
+  }, [token, debouncedSearch, statusFilter, jobsCacheKey]);
 
   useEffect(() => {
     loadJobs();
@@ -166,15 +185,15 @@ export function JobsView() {
       )}
 
       {/* Filter & Search Bar */}
-      <div className="glass-card" style={{ padding: '1rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '240px', background: 'var(--bg-input)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-          <Search size={16} color="var(--text-dim)" />
+      <div className="glass-card" style={{ padding: '0.85rem 1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="search-box-wrapper" style={{ flex: 1, minWidth: '260px' }}>
+          <Search size={15} />
           <input
             type="text"
+            className="input"
             placeholder="Search by job title, department, or JOB-1001..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{ background: 'transparent', border: 'none', color: 'var(--text-main)', width: '100%', outline: 'none', fontSize: '0.9rem' }}
           />
         </div>
 
@@ -182,7 +201,8 @@ export function JobsView() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-md)', outline: 'none', fontSize: '0.85rem' }}
+            className="input"
+            style={{ width: 'auto', height: '38px', padding: '0 0.75rem' }}
           >
             <option value="">All Statuses</option>
             <option value="draft">Drafts</option>
@@ -190,8 +210,8 @@ export function JobsView() {
             <option value="closed">Closed</option>
           </select>
 
-          <button className="btn btn-secondary" onClick={loadJobs} title="Refresh jobs">
-            <RefreshCw size={14} />
+          <button className="btn btn-secondary" onClick={loadJobs} title="Refresh jobs" style={{ height: '38px', padding: '0 0.75rem' }}>
+            <RefreshCw size={14} className={loading ? 'pulse-dot' : ''} />
           </button>
         </div>
       </div>
@@ -201,10 +221,17 @@ export function JobsView() {
         <div className="glass-card" style={{ padding: '1.5rem' }}>
           <JobPipelineView jobId={pipelineJob.id} onClose={() => setPipelineJob(null)} />
         </div>
-      ) : loading ? (
-        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <RefreshCw className="pulse-dot" style={{ margin: '0 auto 1rem auto' }} />
-          <p style={{ color: 'var(--text-muted)' }}>Loading persisted jobs from server...</p>
+      ) : loading && jobs.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="glass-card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '60%' }}>
+                <div className="skeleton" style={{ width: '40%', height: '18px' }} />
+                <div className="skeleton" style={{ width: '65%', height: '14px' }} />
+              </div>
+              <div className="skeleton" style={{ width: '100px', height: '32px' }} />
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--danger)' }}>
@@ -394,6 +421,7 @@ function CreateJobModal({
   const { session } = useAuth();
   const token = session?.access_token;
 
+  const [localClients, setLocalClients] = useState<ClientOption[]>(clients);
   const [title, setTitle] = useState('');
   const [clientId, setClientId] = useState(clients[0]?.id || '');
   const [department, setDepartment] = useState('');
@@ -412,6 +440,46 @@ function CreateJobModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // New Client creation state
+  const [showAddClient, setShowAddClient] = useState(clients.length === 0);
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
+  const [creatingClient, setCreatingClient] = useState(false);
+
+  useEffect(() => {
+    setLocalClients(clients);
+    if (!clientId && clients.length > 0) {
+      setClientId(clients[0].id);
+    }
+  }, [clients, clientId]);
+
+  const handleCreateNewClient = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (!token) return;
+    if (!newClientName.trim() || !newClientEmail.trim()) {
+      setError('Please provide client company name and contact email');
+      return;
+    }
+
+    setCreatingClient(true);
+    setError(null);
+    try {
+      const created = await createClientInOrg(token, {
+        name: newClientName.trim(),
+        contactEmail: newClientEmail.trim(),
+      });
+      setLocalClients((prev) => [created, ...prev]);
+      setClientId(created.id);
+      setShowAddClient(false);
+      setNewClientName('');
+      setNewClientEmail('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to create client company');
+    } finally {
+      setCreatingClient(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -422,8 +490,28 @@ function CreateJobModal({
       return;
     }
 
-    if (!clientId) {
-      setError('Please select or specify a target client company');
+    let targetClientId = clientId;
+
+    // If user is currently typing a new client, auto-create it
+    if (showAddClient && newClientName.trim() && newClientEmail.trim()) {
+      setSubmitting(true);
+      try {
+        const created = await createClientInOrg(token, {
+          name: newClientName.trim(),
+          contactEmail: newClientEmail.trim(),
+        });
+        targetClientId = created.id;
+        setLocalClients((prev) => [created, ...prev]);
+        setClientId(created.id);
+      } catch (err: any) {
+        setError(err.message || 'Failed to create client company');
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    if (!targetClientId) {
+      setError('Please select or create a target client company for this vacancy');
       return;
     }
 
@@ -435,7 +523,7 @@ function CreateJobModal({
         .filter(Boolean);
 
       const created = await createJob(token, {
-        clientId,
+        clientId: targetClientId,
         title,
         department: department || undefined,
         employmentType,
@@ -491,26 +579,53 @@ function CreateJobModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>Client Company *</label>
-              {clients.length > 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Client Company *</label>
+                <button
+                  type="button"
+                  onClick={() => setShowAddClient((v) => !v)}
+                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.75rem', cursor: 'pointer', padding: 0 }}
+                >
+                  {showAddClient ? 'Select existing' : '+ Add new client'}
+                </button>
+              </div>
+
+              {showAddClient ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', padding: '0.65rem', background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+                  <input
+                    type="text"
+                    placeholder="Client Company Name (e.g. Acme)"
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                    style={{ width: '100%', padding: '0.45rem', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.85rem' }}
+                  />
+                  <input
+                    type="email"
+                    placeholder="Client Contact Email"
+                    value={newClientEmail}
+                    onChange={(e) => setNewClientEmail(e.target.value)}
+                    style={{ width: '100%', padding: '0.45rem', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: '4px', color: 'var(--text-main)', fontSize: '0.85rem' }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleCreateNewClient}
+                    disabled={creatingClient || !newClientName.trim() || !newClientEmail.trim()}
+                    style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem', justifyContent: 'center' }}
+                  >
+                    {creatingClient ? 'Saving Client...' : 'Save & Select Client'}
+                  </button>
+                </div>
+              ) : (
                 <select
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                   style={{ width: '100%', padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)' }}
                 >
-                  {clients.map((c) => (
+                  {localClients.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
-              ) : (
-                <input
-                  type="text"
-                  required
-                  placeholder="Client UUID"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)' }}
-                />
               )}
             </div>
 

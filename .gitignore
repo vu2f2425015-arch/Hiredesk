@@ -31,6 +31,8 @@ tmp/
 backups/
 *.sql
 *.gpg
+lighthouse-*.json
+.agents/
 
 # Editor & System
 .vscode/

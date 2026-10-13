@@ -32,6 +32,17 @@ declare global {
  * Validates Supabase JWT from Authorization header, resolves UserProfile,
  * and attaches verified AuthenticatedUser context to req.user.
  */
+interface CachedProfile {
+  user: AuthenticatedUser;
+  expiresAt: number;
+}
+const profileCache = new Map<string, CachedProfile>();
+const PROFILE_CACHE_TTL_MS = 60 * 1000;
+
+export function clearProfileCache(): void {
+  profileCache.clear();
+}
+
 export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
 
@@ -51,6 +62,14 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     if (!verified || !verified.authUserId) {
       sendError(res, 'UNAUTHORIZED', 'Invalid or expired access token', 401);
+      return;
+    }
+
+    // Check in-memory profile cache
+    const cached = profileCache.get(verified.authUserId);
+    if (cached && cached.expiresAt > Date.now()) {
+      req.user = cached.user;
+      next();
       return;
     }
 
@@ -75,7 +94,19 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    req.user = {
+    let organizationId = profile.organizationId;
+    let organizationName = profile.organization ? profile.organization.name : null;
+
+    // If Super Admin has no assigned organization, auto-bind to the primary organization
+    if (!organizationId && profile.role === UserRole.SUPER_ADMIN && prisma.organization?.findFirst) {
+      const defaultOrg = await prisma.organization.findFirst({ orderBy: { createdAt: 'asc' } });
+      if (defaultOrg) {
+        organizationId = defaultOrg.id;
+        organizationName = defaultOrg.name;
+      }
+    }
+
+    const authenticatedUser: AuthenticatedUser = {
       id: profile.id,
       authUserId: profile.authUserId,
       email: profile.email,
@@ -83,13 +114,23 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       lastName: profile.lastName,
       fullName: profile.fullName || `${profile.firstName} ${profile.lastName}`,
       role: profile.role as UserRole,
-      organizationId: profile.organizationId,
-      organizationName: profile.organization ? profile.organization.name : null,
+      organizationId,
+      organizationName,
       clientId: profile.clientId,
       clientName: profile.client ? profile.client.name : null,
       isActive: profile.isActive,
     };
 
+    profileCache.set(verified.authUserId, {
+      user: authenticatedUser,
+      expiresAt: Date.now() + PROFILE_CACHE_TTL_MS,
+    });
+    if (profileCache.size > 1000) {
+      const oldest = profileCache.keys().next().value;
+      if (oldest) profileCache.delete(oldest);
+    }
+
+    req.user = authenticatedUser;
     next();
   } catch (err) {
     logger.error({ err }, 'Error during request authentication');

@@ -1,0 +1,17 @@
+# HiredeskHR Production Robots Policy
+User-agent: *
+Allow: /
+Allow: /career/
+Disallow: /api/
+Disallow: /client-portal
+Disallow: /jobs
+Disallow: /interviews
+Disallow: /talent-pool
+Disallow: /reports
+Disallow: /unmatched
+Disallow: /system-status
+Disallow: /login
+Disallow: /register
+
+# Sitemap location
+Sitemap: https://hiredesk.duckdns.org/sitemap.xml

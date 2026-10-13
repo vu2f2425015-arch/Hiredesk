@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0d14"/>
+      <stop offset="50%" stop-color="#121826"/>
+      <stop offset="100%" stop-color="#0e172a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="200" cy="150" r="250" fill="#6366f1" opacity="0.12" filter="blur(60px)"/>
+  <circle cx="1000" cy="450" r="280" fill="#06b6d4" opacity="0.1" filter="blur(80px)"/>
+  <g transform="translate(100, 180)">
+    <rect x="0" y="0" width="80" height="80" rx="20" fill="url(#accent)"/>
+    <path d="M25 35 L40 25 L55 35 L55 55 L25 55 Z" fill="none" stroke="#ffffff" stroke-width="4" stroke-linejoin="round"/>
+    <text x="110" y="55" font-family="'Outfit', sans-serif, -apple-system" font-size="52" font-weight="800" fill="#ffffff">
+      Hiredesk<tspan fill="#6366f1">HR</tspan>
+    </text>
+    <text x="0" y="140" font-family="'Plus Jakarta Sans', sans-serif, -apple-system" font-size="34" font-weight="700" fill="#f8fafc">
+      Multi-Tenant Recruitment Agency ATS
+    </text>
+    <text x="0" y="195" font-family="'Plus Jakarta Sans', sans-serif, -apple-system" font-size="22" font-weight="400" fill="#94a3b8">
+      Automated Inbound Ingestion • Private Resumes • Client Portals • RFC 5545 Scheduling
+    </text>
+    <rect x="0" y="240" width="180" height="42" rx="21" fill="rgba(99, 102, 241, 0.2)" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="90" y="267" font-family="'Plus Jakarta Sans', sans-serif" font-size="15" font-weight="600" fill="#a5b4fc" text-anchor="middle">
+      ENTERPRISE PILOT
+    </text>
+  </g>
+</svg>

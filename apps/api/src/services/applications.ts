@@ -12,6 +12,7 @@ import {
 import { AuthenticatedUser } from '../middleware/auth.js';
 import { StorageService, validateUploadedFile } from './storage.js';
 import { NotificationService } from './notifications.js';
+import { invalidateMetricsCache } from './analytics.js';
 import { logger } from '../utils/logger.js';
 
 export interface PublicApplyResult {
@@ -241,6 +242,8 @@ export class ApplicationService {
         return app;
       }, { timeout: 35000, maxWait: 15000 });
 
+      invalidateMetricsCache(organization.id);
+
       return {
         applicationId: result.id,
         candidateCode: candidate.candidateCode,
@@ -323,7 +326,7 @@ export class ApplicationService {
         where,
         skip,
         take: limit,
-        orderBy: { appliedAt: 'desc' },
+        orderBy: [{ appliedAt: 'desc' }, { id: 'desc' }],
         include: {
           candidate: {
             select: {
@@ -578,6 +581,8 @@ export class ApplicationService {
 
       return updatedApp;
     }, { timeout: 35000, maxWait: 15000 });
+
+    invalidateMetricsCache(app.organizationId);
 
     return ApplicationService.getApplicationById(user, updated.id);
   }
@@ -949,7 +954,7 @@ export class ApplicationService {
           where,
           skip,
           take: limit,
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           include: {
             applications: {
               where: { clientId: user.clientId || undefined },
@@ -1001,7 +1006,7 @@ export class ApplicationService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         include: {
           _count: { select: { applications: true } },
         },

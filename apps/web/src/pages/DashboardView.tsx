@@ -18,14 +18,26 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { DashboardMetrics, fetchDashboardAnalytics } from '../lib/api';
 import { ApplicationStage } from '@hiredesk/shared';
+import { LiveDiagnosticsBar } from '../components/LiveDiagnosticsBar';
 
 export function DashboardView() {
   const { session, profile } = useAuth();
   const token = session?.access_token;
   const navigate = useNavigate();
 
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const orgId = profile?.organizationId;
+  const cacheKey = orgId ? `hd_dashboard_cache_${orgId}` : null;
+
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(() => {
+    try {
+      if (!cacheKey) return null;
+      const cached = sessionStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState<boolean>(!metrics);
   const [error, setError] = useState<string | null>(null);
 
   const loadMetrics = useCallback(async () => {
@@ -35,12 +47,17 @@ export function DashboardView() {
     try {
       const data = await fetchDashboardAnalytics(token);
       setMetrics(data);
+      if (cacheKey) {
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data));
+        } catch {}
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard metrics');
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, cacheKey]);
 
   useEffect(() => {
     if (token) {
@@ -53,6 +70,8 @@ export function DashboardView() {
   if (!profile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        <LiveDiagnosticsBar />
+
         <div className="glass-card" style={{ borderLeft: '4px solid var(--primary)', padding: '2.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary)', marginBottom: '0.5rem', fontWeight: 600 }}>
             <Sparkles size={18} /> Agency Recruitment ATS Platform
@@ -65,11 +84,11 @@ export function DashboardView() {
             shared mailbox resume ingestion, and strict tenant isolation.
           </p>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <Link to="/login" className="btn btn-primary" style={{ padding: '0.6rem 1.5rem', fontSize: '0.95rem' }}>
-              Sign In to Recruiter Workspace <ArrowRight size={16} />
+            <Link to="/register" className="btn btn-primary" style={{ padding: '0.6rem 1.5rem', fontSize: '0.95rem' }}>
+              Register Your Agency <ArrowRight size={16} />
             </Link>
-            <Link to="/jobs" className="btn btn-secondary" style={{ padding: '0.6rem 1.25rem', fontSize: '0.95rem' }}>
-              Explore Vacancies
+            <Link to="/login" className="btn btn-secondary" style={{ padding: '0.6rem 1.25rem', fontSize: '0.95rem' }}>
+              Sign In to Workspace
             </Link>
           </div>
         </div>
@@ -94,12 +113,26 @@ export function DashboardView() {
             </p>
           </div>
         </div>
+
+        <div className="glass-card" style={{ padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.5rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.35rem' }}>Ready to launch your agency hiring operations?</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', maxWidth: '640px', margin: 0 }}>
+              Create an agency account in seconds. Each agency gets an isolated workspace with zero mock business data, custom career portals, and automated IMAP email ingestion.
+            </p>
+          </div>
+          <Link to="/register" className="btn btn-primary" style={{ padding: '0.65rem 1.35rem' }}>
+            Get Started Now <ArrowRight size={16} />
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+      <LiveDiagnosticsBar />
+
       {/* Top Welcome & Context Banner */}
       <div
         className="glass-card"
@@ -151,9 +184,14 @@ export function DashboardView() {
       </div>
 
       {loading && !metrics ? (
-        <div className="glass-card" style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
-          <RefreshCw className="pulse-dot" style={{ margin: '0 auto 1rem auto' }} />
-          <p>Computing real-time analytics from database...</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="glass-card" style={{ padding: '1.25rem', height: '110px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div className="skeleton" style={{ width: '50%', height: '14px' }} />
+              <div className="skeleton" style={{ width: '35%', height: '28px' }} />
+              <div className="skeleton" style={{ width: '70%', height: '10px' }} />
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div
@@ -178,6 +216,70 @@ export function DashboardView() {
         </div>
       ) : metrics ? (
         <>
+          {/* New Workspace Onboarding Hub (Zero Mock Data Guarantee) */}
+          {metrics.totalJobs === 0 && metrics.totalCandidates === 0 && (
+            <div
+              className="glass-card"
+              style={{
+                border: '1px solid rgba(99, 102, 241, 0.35)',
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(6, 182, 212, 0.05) 100%)',
+                padding: '1.75rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1.25rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary)', fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '0.35rem' }}>
+                    <Sparkles size={14} /> Workspace Initialized &bull; Zero Mock Data
+                  </div>
+                  <h2 style={{ fontSize: '1.35rem', margin: 0 }}>
+                    Welcome to your agency command center
+                  </h2>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.35rem', maxWidth: '650px' }}>
+                    Your organization is fresh, secure, and isolated. As you post vacancies and candidates apply, your real-time recruitment pipeline metrics will populate directly from PostgreSQL.
+                  </p>
+                </div>
+                <Link to="/jobs" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.65rem 1.25rem' }}>
+                  <Briefcase size={16} /> Post First Vacancy
+                </Link>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem', marginTop: '0.25rem' }}>
+                <div style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(99,102,241,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>1</span>
+                    Create a Job Opening
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                    Define title, department, salary ranges, and allocate an atomic sequence Job Code (e.g. <code>JOB-1001</code>).
+                  </p>
+                </div>
+
+                <div style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem', color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(6,182,212,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>2</span>
+                    Share Public Career Portal
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                    Every opening gets an isolated application portal where candidates submit their CVs with instant resume processing.
+                  </p>
+                </div>
+
+                <div style={{ padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem', color: 'var(--accent-violet)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(139,92,246,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem' }}>3</span>
+                    Email Ingestion Bridge
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                    Resumes received via connected mailboxes referencing your Job Code are automatically parsed and filed idempotently.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* KPI Stat Cards (Database Computed) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
             {/* Active Jobs */}
@@ -461,6 +563,7 @@ export function DashboardView() {
               )}
             </div>
           </div>
+
         </>
       ) : null}
     </div>

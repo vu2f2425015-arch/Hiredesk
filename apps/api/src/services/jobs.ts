@@ -8,6 +8,7 @@ import {
   PublicJobDto,
 } from '@hiredesk/shared';
 import { AuthenticatedUser } from '../middleware/auth.js';
+import { invalidateMetricsCache } from './analytics.js';
 
 export interface JobWithMeta {
   id: string;
@@ -113,6 +114,8 @@ export class JobService {
       },
     });
 
+    invalidateMetricsCache(organizationId);
+
     return JobService.mapJobToMeta(created);
   }
 
@@ -160,7 +163,7 @@ export class JobService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         include: {
           client: {
             select: { id: true, name: true },
@@ -287,6 +290,8 @@ export class JobService {
       },
     });
 
+    invalidateMetricsCache(updated.organizationId);
+
     return JobService.mapJobToMeta(updated);
   }
 
@@ -326,6 +331,8 @@ export class JobService {
         },
       },
     });
+
+    invalidateMetricsCache(updated.organizationId);
 
     return JobService.mapJobToMeta(updated);
   }
@@ -377,6 +384,8 @@ export class JobService {
         },
       },
     });
+
+    invalidateMetricsCache(duplicated.organizationId);
 
     return JobService.mapJobToMeta(duplicated);
   }

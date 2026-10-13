@@ -301,25 +301,17 @@ export function UnmatchedApplicationsView() {
 
           {/* Search Form */}
           <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+            <div className="search-box-wrapper" style={{ width: '250px' }}>
+              <Search size={14} />
               <input
                 type="text"
+                className="input"
                 placeholder="Search subject / sender..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--text-main)',
-                  padding: '0.4rem 0.75rem 0.4rem 2.2rem',
-                  fontSize: '0.85rem',
-                  width: '240px',
-                }}
               />
             </div>
-            <button type="submit" className="btn btn-secondary" style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}>
+            <button type="submit" className="btn btn-secondary" style={{ padding: '0.4rem 0.85rem', fontSize: '0.85rem', height: '38px' }}>
               Filter
             </button>
           </form>
@@ -329,9 +321,16 @@ export function UnmatchedApplicationsView() {
       {/* Main Table */}
       <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
         {loading && items.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <RefreshCw size={24} className="spin-icon" style={{ margin: '0 auto 0.75rem' }} />
-            Loading inbound applications...
+          <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '50%' }}>
+                  <div className="skeleton" style={{ width: '60%', height: '14px' }} />
+                  <div className="skeleton" style={{ width: '40%', height: '11px' }} />
+                </div>
+                <div className="skeleton" style={{ width: '80px', height: '24px' }} />
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--danger)' }}>

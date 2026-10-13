@@ -9,6 +9,44 @@
       name="description"
       content="HiredeskHR is a real, production-grade ATS built for recruitment agencies to manage clients, candidate pipelines, and automated application ingestion."
     />
+    <meta name="theme-color" content="#0a0d14" id="theme-color-meta" />
+
+    <!-- Open Graph Metadata -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="HiredeskHR — Multi-Tenant Recruitment Agency ATS" />
+    <meta
+      property="og:description"
+      content="Production ATS designed for recruitment agencies to manage multi-tenant clients, automated Gmail ingestion, talent pools, and candidate pipelines."
+    />
+    <meta property="og:site_name" content="HiredeskHR" />
+    <meta property="og:image" content="/og-preview.svg" />
+
+    <!-- Twitter Social Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="HiredeskHR — Recruitment Agency ATS" />
+    <meta
+      name="twitter:description"
+      content="Applicant Tracking System with automated inbound ingestion, private resume storage, and dedicated client portals."
+    />
+    <meta name="twitter:image" content="/og-preview.svg" />
+
+    <!-- Instant Theme Initialization Script (Prevents Theme Flash) -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('hiredesk-theme');
+          var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var theme = saved || (systemDark ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+          var meta = document.getElementById('theme-color-meta');
+          if (meta) {
+            meta.setAttribute('content', theme === 'light' ? '#f8fafc' : '#0a0d14');
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Google Fonts with Preconnect and Display Swap -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
