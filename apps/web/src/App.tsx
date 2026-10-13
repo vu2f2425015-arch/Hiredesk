@@ -49,6 +49,26 @@ interface HealthResponse {
   environment: string;
 }
 
+function ProtectedRoute({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles?: UserRole[];
+}) {
+  const { profile, loading } = useAuth();
+  if (loading) {
+    return <PageLoadingSkeleton />;
+  }
+  if (!profile) {
+    return <Navigate to="/login" replace />;
+  }
+  if (allowedRoles && !allowedRoles.includes(profile.role)) {
+    return <Navigate to={profile.role === UserRole.CLIENT ? '/client-portal' : '/'} replace />;
+  }
+  return <>{children}</>;
+}
+
 export function App() {
   return (
     <AuthProvider>
@@ -162,7 +182,16 @@ function AppShell() {
 
         {/* Desktop Navigation Links */}
         <nav className="nav-links" aria-label="Main Navigation">
-          {isClient ? (
+          {!profile ? (
+            <>
+              <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} end>
+                <Layers size={15} /> Overview
+              </NavLink>
+              <NavLink to="/system-status" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                <Activity size={15} /> System Health
+              </NavLink>
+            </>
+          ) : isClient ? (
             <>
               <NavLink to="/client-portal" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 <Briefcase size={15} /> Client Portal
@@ -298,7 +327,39 @@ function AppShell() {
 
       {/* Mobile Drawer Navigation */}
       <div className={`mobile-menu-drawer ${mobileMenuOpen ? 'is-open' : ''}`} role="navigation" aria-label="Mobile Navigation">
-        {isClient ? (
+        {!profile ? (
+          <>
+            <NavLink
+              to="/"
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+              end
+            >
+              <Layers size={18} /> Overview
+            </NavLink>
+            <NavLink
+              to="/system-status"
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Activity size={18} /> System Health
+            </NavLink>
+            <NavLink
+              to="/login"
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <LogIn size={18} /> Sign In
+            </NavLink>
+            <NavLink
+              to="/register"
+              className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Briefcase size={18} /> Register Agency
+            </NavLink>
+          </>
+        ) : isClient ? (
           <>
             <NavLink
               to="/client-portal"
@@ -369,27 +430,63 @@ function AppShell() {
         <Suspense fallback={<PageLoadingSkeleton />}>
           <Routes>
             <Route path="/" element={isClient ? <ClientPortalView /> : <DashboardView />} />
-            <Route path="/client-portal" element={<ClientPortalView />} />
-            <Route path="/login" element={<AuthView initialMode="login" />} />
-            <Route path="/register" element={<AuthView initialMode="register" />} />
-            <Route path="/jobs" element={isClient ? <Navigate to="/client-portal" replace /> : <JobsView />} />
+            <Route
+              path="/client-portal"
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.CLIENT, UserRole.SUPER_ADMIN]}>
+                  <ClientPortalView />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/login"
+              element={profile ? <Navigate to={isClient ? '/client-portal' : '/'} replace /> : <AuthView initialMode="login" />}
+            />
+            <Route
+              path="/register"
+              element={profile ? <Navigate to={isClient ? '/client-portal' : '/'} replace /> : <AuthView initialMode="register" />}
+            />
+            <Route
+              path="/jobs"
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER]}>
+                  <JobsView />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/interviews"
-              element={isClient ? <Navigate to="/client-portal" replace /> : <InterviewsView />}
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER]}>
+                  <InterviewsView />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/talent-pool"
-              element={isClient ? <Navigate to="/client-portal" replace /> : <TalentPoolView />}
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER]}>
+                  <TalentPoolView />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/reports"
-              element={isClient ? <Navigate to="/client-portal" replace /> : <ReportsView />}
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER]}>
+                  <ReportsView />
+                </ProtectedRoute>
+              }
             />
             <Route path="/career/:orgSlug" element={<PublicCareerView />} />
             <Route path="/career/:orgSlug/:jobCode" element={<PublicCareerView />} />
             <Route
               path="/unmatched"
-              element={isClient ? <Navigate to="/client-portal" replace /> : <UnmatchedApplicationsView />}
+              element={
+                <ProtectedRoute allowedRoles={[UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER]}>
+                  <UnmatchedApplicationsView />
+                </ProtectedRoute>
+              }
             />
             <Route path="/system-status" element={<SystemStatusView health={health} loading={loading} error={error} />} />
           </Routes>

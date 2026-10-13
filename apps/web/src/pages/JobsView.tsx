@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Briefcase,
@@ -52,7 +53,7 @@ export function JobsView() {
     }
   });
   const [clients, setClients] = useState<ClientOption[]>([]);
-  const [loading, setLoading] = useState<boolean>(jobs.length === 0);
+  const [loading, setLoading] = useState<boolean>(Boolean(token) && jobs.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
   const debouncedSearch = useDebounce(search, 250);
@@ -89,8 +90,12 @@ export function JobsView() {
   }, [token, debouncedSearch, statusFilter, jobsCacheKey]);
 
   useEffect(() => {
-    loadJobs();
-  }, [loadJobs]);
+    if (token) {
+      loadJobs();
+    } else {
+      setLoading(false);
+    }
+  }, [token, loadJobs]);
 
   useEffect(() => {
     if (token && profile?.organizationId) {
@@ -157,6 +162,40 @@ export function JobsView() {
   };
 
   const canCreate = profile && [UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.RECRUITER].includes(profile.role);
+
+  if (!profile || !token) {
+    return (
+      <div className="glass-card" style={{ padding: '3.5rem 2rem', textAlign: 'center', maxWidth: '580px', margin: '3rem auto' }}>
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            background: 'rgba(99, 102, 241, 0.12)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--primary)',
+            margin: '0 auto 1.25rem auto',
+          }}
+        >
+          <Briefcase size={28} />
+        </div>
+        <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Authentication Required</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '1.75rem', lineHeight: 1.5 }}>
+          You must be signed in to an agency workspace to view recruitment vacancies, atomic Job Codes, and candidate pipelines.
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+          <Link to="/login" className="btn btn-primary" style={{ padding: '0.65rem 1.5rem' }}>
+            Sign In to Workspace
+          </Link>
+          <Link to="/register" className="btn btn-secondary" style={{ padding: '0.65rem 1.35rem' }}>
+            Register Agency
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

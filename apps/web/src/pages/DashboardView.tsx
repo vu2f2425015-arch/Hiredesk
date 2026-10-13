@@ -169,7 +169,7 @@ export function DashboardView() {
             Welcome back, {profile.firstName || profile.fullName || 'Recruiter'}
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.35rem' }}>
-            {profile.organizationName || 'Platform Super-Admin'} &bull; Database-backed recruitment pipeline & metrics
+            {profile.organizationName || 'Platform Super-Admin'} &bull; Database backend recruitment pipeline & metrics
           </p>
         </div>
 
