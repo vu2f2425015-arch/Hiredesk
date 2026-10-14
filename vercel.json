@@ -4,19 +4,9 @@
   "outputDirectory": "apps/web/dist",
   "installCommand": "npm install",
   "framework": null,
-  "functions": {
-    "api/index.ts": {
-      "memory": 512,
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api"
-    },
-    {
-      "source": "/((?!api/).*)",
+      "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }
   ],

@@ -1,4 +1,14 @@
 import { CreateJobInput, UpdateJobInput, JobQueryInput, PublicJobDto, RegisterUserInput } from '@hiredesk/shared';
+import { API_BASE } from './config';
+
+/**
+ * Fetch wrapper that prepends the API base URL.
+ * In development: API_BASE is empty, so paths stay relative (handled by Vite proxy).
+ * In production: API_BASE is the Render backend origin (e.g., https://hiredesk-api.onrender.com).
+ */
+function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${API_BASE}${input}`, init);
+}
 
 export interface ApiJob {
   id: string;
@@ -49,7 +59,7 @@ export async function fetchJobs(
   if (query?.page) params.set('page', String(query.page));
   if (query?.limit) params.set('limit', String(query.limit));
 
-  const res = await fetch(`/api/jobs?${params.toString()}`, {
+  const res = await apiFetch(`/api/jobs?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -67,7 +77,7 @@ export async function fetchJobs(
 }
 
 export async function fetchJobById(token: string, id: string): Promise<ApiJob> {
-  const res = await fetch(`/api/jobs/${id}`, {
+  const res = await apiFetch(`/api/jobs/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -78,7 +88,7 @@ export async function fetchJobById(token: string, id: string): Promise<ApiJob> {
 }
 
 export async function createJob(token: string, input: CreateJobInput): Promise<ApiJob> {
-  const res = await fetch('/api/jobs', {
+  const res = await apiFetch('/api/jobs', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -94,7 +104,7 @@ export async function createJob(token: string, input: CreateJobInput): Promise<A
 }
 
 export async function updateJob(token: string, id: string, input: UpdateJobInput): Promise<ApiJob> {
-  const res = await fetch(`/api/jobs/${id}`, {
+  const res = await apiFetch(`/api/jobs/${id}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -110,7 +120,7 @@ export async function updateJob(token: string, id: string, input: UpdateJobInput
 }
 
 export async function publishJob(token: string, id: string): Promise<ApiJob> {
-  const res = await fetch(`/api/jobs/${id}/publish`, {
+  const res = await apiFetch(`/api/jobs/${id}/publish`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -122,7 +132,7 @@ export async function publishJob(token: string, id: string): Promise<ApiJob> {
 }
 
 export async function closeJob(token: string, id: string): Promise<ApiJob> {
-  const res = await fetch(`/api/jobs/${id}/close`, {
+  const res = await apiFetch(`/api/jobs/${id}/close`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -134,7 +144,7 @@ export async function closeJob(token: string, id: string): Promise<ApiJob> {
 }
 
 export async function reopenJob(token: string, id: string): Promise<ApiJob> {
-  const res = await fetch(`/api/jobs/${id}/reopen`, {
+  const res = await apiFetch(`/api/jobs/${id}/reopen`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -146,7 +156,7 @@ export async function reopenJob(token: string, id: string): Promise<ApiJob> {
 }
 
 export async function duplicateJob(token: string, id: string): Promise<ApiJob> {
-  const res = await fetch(`/api/jobs/${id}/duplicate`, {
+  const res = await apiFetch(`/api/jobs/${id}/duplicate`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -158,7 +168,7 @@ export async function duplicateJob(token: string, id: string): Promise<ApiJob> {
 }
 
 export async function fetchClientsForOrg(token: string, orgId: string): Promise<ClientOption[]> {
-  const res = await fetch(`/api/admin/organizations/${orgId}`, {
+  const res = await apiFetch(`/api/admin/organizations/${orgId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -172,7 +182,7 @@ export async function createClientInOrg(
   token: string,
   data: { name: string; contactEmail: string; contactPhone?: string; organizationId?: string }
 ): Promise<ClientOption> {
-  const res = await fetch('/api/admin/clients', {
+  const res = await apiFetch('/api/admin/clients', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -206,7 +216,7 @@ export async function registerUser(input: RegisterUserInput): Promise<{
   };
   defaultClientId: string;
 }> {
-  const res = await fetch('/api/auth/register', {
+  const res = await apiFetch('/api/auth/register', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -222,7 +232,7 @@ export async function registerUser(input: RegisterUserInput): Promise<{
 
 
 export async function fetchPublicCareerJobs(orgSlug: string): Promise<{ organization: { name: string; slug: string }; jobs: PublicJobDto[] }> {
-  const res = await fetch(`/api/career/${orgSlug}/jobs`);
+  const res = await apiFetch(`/api/career/${orgSlug}/jobs`);
   const json = await res.json();
   if (!res.ok || !json.success) {
     throw new Error(json.error?.message || 'Failed to load career page');
@@ -231,7 +241,7 @@ export async function fetchPublicCareerJobs(orgSlug: string): Promise<{ organiza
 }
 
 export async function fetchPublicCareerJobByCode(orgSlug: string, jobCode: string): Promise<PublicJobDto> {
-  const res = await fetch(`/api/career/${orgSlug}/jobs/${jobCode}`);
+  const res = await apiFetch(`/api/career/${orgSlug}/jobs/${jobCode}`);
   const json = await res.json();
   if (!res.ok || !json.success) {
     throw new Error(json.error?.message || 'Job vacancy not found');
@@ -252,7 +262,7 @@ export async function submitPublicApplication(
   jobCode: string,
   formData: FormData
 ): Promise<PublicApplyResult> {
-  const res = await fetch(`/api/career/${orgSlug}/jobs/${jobCode}/applications`, {
+  const res = await apiFetch(`/api/career/${orgSlug}/jobs/${jobCode}/applications`, {
     method: 'POST',
     body: formData,
   });
@@ -292,7 +302,7 @@ export async function fetchJobApplications(
   token: string,
   jobId: string
 ): Promise<{ applications: ApplicationItem[]; total: number }> {
-  const res = await fetch(`/api/jobs/${jobId}/applications`, {
+  const res = await apiFetch(`/api/jobs/${jobId}/applications`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -309,7 +319,7 @@ export async function fetchResumeDownloadUrl(
   token: string,
   applicationId: string
 ): Promise<{ signedUrl: string; filename: string }> {
-  const res = await fetch(`/api/applications/${applicationId}/resume`, {
+  const res = await apiFetch(`/api/applications/${applicationId}/resume`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -463,7 +473,7 @@ export async function fetchDashboardAnalytics(
   organizationId?: string
 ): Promise<DashboardMetrics> {
   const url = organizationId ? `/api/analytics/dashboard?organizationId=${organizationId}` : '/api/analytics/dashboard';
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -474,7 +484,7 @@ export async function fetchDashboardAnalytics(
 }
 
 export async function fetchJobPipeline(token: string, jobId: string): Promise<JobPipeline> {
-  const res = await fetch(`/api/jobs/${jobId}/pipeline`, {
+  const res = await apiFetch(`/api/jobs/${jobId}/pipeline`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -490,7 +500,7 @@ export async function transitionApplicationStage(
   stage: string,
   reason?: string
 ): Promise<any> {
-  const res = await fetch(`/api/applications/${applicationId}/stage`, {
+  const res = await apiFetch(`/api/applications/${applicationId}/stage`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -510,7 +520,7 @@ export async function updateApplicationNotes(
   applicationId: string,
   input: { recruiterNotes?: string; clientFeedback?: string }
 ): Promise<any> {
-  const res = await fetch(`/api/applications/${applicationId}/notes`, {
+  const res = await apiFetch(`/api/applications/${applicationId}/notes`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -526,7 +536,7 @@ export async function updateApplicationNotes(
 }
 
 export async function fetchCandidateProfile(token: string, candidateId: string): Promise<CandidateProfile> {
-  const res = await fetch(`/api/candidates/${candidateId}`, {
+  const res = await apiFetch(`/api/candidates/${candidateId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -545,7 +555,7 @@ export async function fetchCandidates(
   if (query?.page) params.set('page', String(query.page));
   if (query?.limit) params.set('limit', String(query.limit));
 
-  const res = await fetch(`/api/candidates?${params.toString()}`, {
+  const res = await apiFetch(`/api/candidates?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -654,7 +664,7 @@ export interface ClientPortalApplication {
 }
 
 export async function fetchClientProfile(token: string): Promise<ClientPortalMe> {
-  const res = await fetch('/api/client-portal/me', {
+  const res = await apiFetch('/api/client-portal/me', {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -673,7 +683,7 @@ export async function fetchClientJobs(
   if (query?.page) params.set('page', String(query.page));
   if (query?.limit) params.set('limit', String(query.limit));
 
-  const res = await fetch(`/api/client-portal/jobs?${params.toString()}`, {
+  const res = await apiFetch(`/api/client-portal/jobs?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -705,7 +715,7 @@ export async function fetchClientJobApplications(
   if (query?.page) params.set('page', String(query.page));
   if (query?.limit) params.set('limit', String(query.limit));
 
-  const res = await fetch(`/api/client-portal/jobs/${jobId}/applications?${params.toString()}`, {
+  const res = await apiFetch(`/api/client-portal/jobs/${jobId}/applications?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -722,7 +732,7 @@ export async function fetchClientJobApplications(
 }
 
 export async function fetchClientApplication(token: string, applicationId: string): Promise<ClientPortalApplication> {
-  const res = await fetch(`/api/client-portal/applications/${applicationId}`, {
+  const res = await apiFetch(`/api/client-portal/applications/${applicationId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -736,7 +746,7 @@ export async function fetchClientResumeUrl(
   token: string,
   applicationId: string
 ): Promise<{ signedUrl: string; filename: string; expiresIn: number }> {
-  const res = await fetch(`/api/client-portal/applications/${applicationId}/resume`, {
+  const res = await apiFetch(`/api/client-portal/applications/${applicationId}/resume`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -751,7 +761,7 @@ export async function clientShortlistCandidate(
   applicationId: string,
   notes?: string
 ): Promise<ClientPortalApplication> {
-  const res = await fetch(`/api/client-portal/applications/${applicationId}/shortlist`, {
+  const res = await apiFetch(`/api/client-portal/applications/${applicationId}/shortlist`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -771,7 +781,7 @@ export async function clientRejectCandidate(
   applicationId: string,
   reason: string
 ): Promise<ClientPortalApplication> {
-  const res = await fetch(`/api/client-portal/applications/${applicationId}/reject`, {
+  const res = await apiFetch(`/api/client-portal/applications/${applicationId}/reject`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -792,7 +802,7 @@ export async function clientRequestInterview(
   preferredTimes: string[],
   notes?: string
 ): Promise<{ id: string; status: string; message: string; preferredTimes: string[]; notes?: string | null }> {
-  const res = await fetch(`/api/client-portal/applications/${applicationId}/request-interview`, {
+  const res = await apiFetch(`/api/client-portal/applications/${applicationId}/request-interview`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -812,7 +822,7 @@ export async function clientSubmitFeedback(
   applicationId: string,
   feedback: string
 ): Promise<ClientPortalApplication> {
-  const res = await fetch(`/api/client-portal/applications/${applicationId}/feedback`, {
+  const res = await apiFetch(`/api/client-portal/applications/${applicationId}/feedback`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -994,7 +1004,7 @@ export async function fetchInterviews(
   if (query?.page) params.set('page', String(query.page));
   if (query?.limit) params.set('limit', String(query.limit));
 
-  const res = await fetch(`/api/interviews?${params.toString()}`, {
+  const res = await apiFetch(`/api/interviews?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1010,7 +1020,7 @@ export async function fetchInterviews(
 }
 
 export async function fetchInterview(token: string, id: string): Promise<ApiInterview> {
-  const res = await fetch(`/api/interviews/${id}`, {
+  const res = await apiFetch(`/api/interviews/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1039,7 +1049,7 @@ export async function scheduleInterview(
     interviewerNotes?: string | null;
   }
 ): Promise<ApiInterview> {
-  const res = await fetch('/api/interviews', {
+  const res = await apiFetch('/api/interviews', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1068,7 +1078,7 @@ export async function rescheduleInterview(
     interviewerNotes?: string | null;
   }
 ): Promise<ApiInterview> {
-  const res = await fetch(`/api/interviews/${id}/reschedule`, {
+  const res = await apiFetch(`/api/interviews/${id}/reschedule`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1088,7 +1098,7 @@ export async function cancelInterview(
   id: string,
   reason: string
 ): Promise<ApiInterview> {
-  const res = await fetch(`/api/interviews/${id}/cancel`, {
+  const res = await apiFetch(`/api/interviews/${id}/cancel`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1112,7 +1122,7 @@ export async function completeInterview(
     interviewerNotes?: string | null;
   }
 ): Promise<ApiInterview> {
-  const res = await fetch(`/api/interviews/${id}/complete`, {
+  const res = await apiFetch(`/api/interviews/${id}/complete`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1132,7 +1142,7 @@ export async function recordNoShow(
   id: string,
   notes?: string
 ): Promise<ApiInterview> {
-  const res = await fetch(`/api/interviews/${id}/no-show`, {
+  const res = await apiFetch(`/api/interviews/${id}/no-show`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1152,7 +1162,7 @@ export async function updateInterviewFeedback(
   id: string,
   payload: { feedback: string; result?: string | null }
 ): Promise<ApiInterview> {
-  const res = await fetch(`/api/interviews/${id}/feedback`, {
+  const res = await apiFetch(`/api/interviews/${id}/feedback`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1172,7 +1182,7 @@ export async function retryOutboundCommunication(
   interviewId: string,
   commId: string
 ): Promise<{ retried: boolean; success: boolean }> {
-  const res = await fetch(`/api/interviews/${interviewId}/communications/${commId}/retry`, {
+  const res = await apiFetch(`/api/interviews/${interviewId}/communications/${commId}/retry`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -1184,7 +1194,7 @@ export async function retryOutboundCommunication(
 }
 
 export async function fetchInterviewers(token: string): Promise<ApiInterviewerOption[]> {
-  const res = await fetch('/api/interviews/metadata/interviewers', {
+  const res = await apiFetch('/api/interviews/metadata/interviewers', {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1195,7 +1205,7 @@ export async function fetchInterviewers(token: string): Promise<ApiInterviewerOp
 }
 
 export async function fetchPendingInterviewRequests(token: string): Promise<ApiPendingInterviewRequest[]> {
-  const res = await fetch('/api/interviews/metadata/pending-requests', {
+  const res = await apiFetch('/api/interviews/metadata/pending-requests', {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1215,7 +1225,7 @@ export async function fetchClientScheduledInterviews(
   if (query?.page) params.set('page', String(query.page));
   if (query?.limit) params.set('limit', String(query.limit));
 
-  const res = await fetch(`/api/client-portal/interviews?${params.toString()}`, {
+  const res = await apiFetch(`/api/client-portal/interviews?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1231,7 +1241,7 @@ export async function fetchClientScheduledInterviews(
 }
 
 export async function fetchClientScheduledInterview(token: string, id: string): Promise<ApiInterview> {
-  const res = await fetch(`/api/client-portal/interviews/${id}`, {
+  const res = await apiFetch(`/api/client-portal/interviews/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1332,7 +1342,7 @@ export async function fetchTalentPoolCandidates(
   if (query?.page) params.set('page', String(query.page));
   if (query?.limit) params.set('limit', String(query.limit));
 
-  const res = await fetch(`/api/talent-pool/candidates?${params.toString()}`, {
+  const res = await apiFetch(`/api/talent-pool/candidates?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1343,7 +1353,7 @@ export async function fetchTalentPoolCandidates(
 }
 
 export async function fetchTalentPoolCandidate(token: string, candidateId: string): Promise<any> {
-  const res = await fetch(`/api/talent-pool/candidates/${candidateId}`, {
+  const res = await apiFetch(`/api/talent-pool/candidates/${candidateId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1358,7 +1368,7 @@ export async function associateCandidateWithJob(
   candidateId: string,
   payload: { jobId: string; source?: string; recruiterNotes?: string }
 ): Promise<{ application: any; isExisting: boolean; message: string }> {
-  const res = await fetch(`/api/talent-pool/candidates/${candidateId}/applications`, {
+  const res = await apiFetch(`/api/talent-pool/candidates/${candidateId}/applications`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1374,7 +1384,7 @@ export async function associateCandidateWithJob(
 }
 
 export async function fetchTalentPoolFolders(token: string): Promise<TalentPoolFolder[]> {
-  const res = await fetch('/api/talent-pool/folders', {
+  const res = await apiFetch('/api/talent-pool/folders', {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1388,7 +1398,7 @@ export async function createTalentPoolFolder(
   token: string,
   payload: { name: string; description?: string }
 ): Promise<TalentPoolFolder> {
-  const res = await fetch('/api/talent-pool/folders', {
+  const res = await apiFetch('/api/talent-pool/folders', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1408,7 +1418,7 @@ export async function updateTalentPoolFolder(
   folderId: string,
   payload: { name?: string; description?: string }
 ): Promise<TalentPoolFolder> {
-  const res = await fetch(`/api/talent-pool/folders/${folderId}`, {
+  const res = await apiFetch(`/api/talent-pool/folders/${folderId}`, {
     method: 'PATCH',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1424,7 +1434,7 @@ export async function updateTalentPoolFolder(
 }
 
 export async function deleteTalentPoolFolder(token: string, folderId: string): Promise<{ success: boolean }> {
-  const res = await fetch(`/api/talent-pool/folders/${folderId}`, {
+  const res = await apiFetch(`/api/talent-pool/folders/${folderId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -1440,7 +1450,7 @@ export async function addCandidateToFolder(
   folderId: string,
   candidateId: string
 ): Promise<{ success: boolean; message: string }> {
-  const res = await fetch(`/api/talent-pool/folders/${folderId}/candidates`, {
+  const res = await apiFetch(`/api/talent-pool/folders/${folderId}/candidates`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -1460,7 +1470,7 @@ export async function removeCandidateFromFolder(
   folderId: string,
   candidateId: string
 ): Promise<{ success: boolean; message: string }> {
-  const res = await fetch(`/api/talent-pool/folders/${folderId}/candidates/${candidateId}`, {
+  const res = await apiFetch(`/api/talent-pool/folders/${folderId}/candidates/${candidateId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -1509,7 +1519,7 @@ export async function fetchNotifications(
   if (query.limit) params.set('limit', String(query.limit));
   if (query.unreadOnly) params.set('unreadOnly', 'true');
 
-  const res = await fetch(`/api/notifications?${params.toString()}`, {
+  const res = await apiFetch(`/api/notifications?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1520,7 +1530,7 @@ export async function fetchNotifications(
 }
 
 export async function fetchUnreadNotificationCount(token: string): Promise<number> {
-  const res = await fetch('/api/notifications/unread-count', {
+  const res = await apiFetch('/api/notifications/unread-count', {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1529,7 +1539,7 @@ export async function fetchUnreadNotificationCount(token: string): Promise<numbe
 }
 
 export async function markNotificationAsRead(token: string, notificationId: string): Promise<InAppNotification> {
-  const res = await fetch(`/api/notifications/${notificationId}/read`, {
+  const res = await apiFetch(`/api/notifications/${notificationId}/read`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -1541,7 +1551,7 @@ export async function markNotificationAsRead(token: string, notificationId: stri
 }
 
 export async function markAllNotificationsAsRead(token: string): Promise<{ updatedCount: number }> {
-  const res = await fetch('/api/notifications/mark-all-read', {
+  const res = await apiFetch('/api/notifications/mark-all-read', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -1629,7 +1639,7 @@ export async function fetchFunnelReport(
   if (query.startDate) params.set('startDate', query.startDate);
   if (query.endDate) params.set('endDate', query.endDate);
 
-  const res = await fetch(`/api/analytics/reports/funnel?${params.toString()}`, {
+  const res = await apiFetch(`/api/analytics/reports/funnel?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1646,7 +1656,7 @@ export async function fetchTimeToHireReport(
   if (query.startDate) params.set('startDate', query.startDate);
   if (query.endDate) params.set('endDate', query.endDate);
 
-  const res = await fetch(`/api/analytics/reports/time-to-hire?${params.toString()}`, {
+  const res = await apiFetch(`/api/analytics/reports/time-to-hire?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1663,7 +1673,7 @@ export async function fetchCandidateSourcesReport(
   if (query.startDate) params.set('startDate', query.startDate);
   if (query.endDate) params.set('endDate', query.endDate);
 
-  const res = await fetch(`/api/analytics/reports/sources?${params.toString()}`, {
+  const res = await apiFetch(`/api/analytics/reports/sources?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1679,7 +1689,7 @@ export async function fetchRecruiterProductivityReport(
   if (query.startDate) params.set('startDate', query.startDate);
   if (query.endDate) params.set('endDate', query.endDate);
 
-  const res = await fetch(`/api/analytics/reports/productivity?${params.toString()}`, {
+  const res = await apiFetch(`/api/analytics/reports/productivity?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1695,7 +1705,7 @@ export async function fetchJobOutcomesReport(
   if (query.clientId) params.set('clientId', query.clientId);
   if (query.jobId) params.set('jobId', query.jobId);
 
-  const res = await fetch(`/api/analytics/reports/jobs?${params.toString()}`, {
+  const res = await apiFetch(`/api/analytics/reports/jobs?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1744,7 +1754,7 @@ export interface AiRecruiterMatchEvaluation {
 }
 
 export async function fetchAiRecruiterStatus(token: string): Promise<AiRecruiterStatus> {
-  const res = await fetch('/api/ai-recruiter/status', {
+  const res = await apiFetch('/api/ai-recruiter/status', {
     headers: { Authorization: `Bearer ${token}` },
   });
   const json = await res.json();
@@ -1756,7 +1766,7 @@ export async function evaluateCandidateMatch(
   token: string,
   payload: { applicationId: string; jobId?: string }
 ): Promise<AiRecruiterMatchEvaluation> {
-  const res = await fetch('/api/ai-recruiter/match', {
+  const res = await apiFetch('/api/ai-recruiter/match', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE } from '../lib/config';
 import {
   Inbox,
   RefreshCw,
@@ -83,7 +84,7 @@ export function UnmatchedApplicationsView() {
       params.append('page', String(page));
       params.append('limit', '20');
 
-      const res = await fetch(`/api/admin/inbound-applications?${params.toString()}`, {
+      const res = await fetch(`${API_BASE}/api/admin/inbound-applications?${params.toString()}`, {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -111,7 +112,7 @@ export function UnmatchedApplicationsView() {
   const fetchJobsForAssignment = async () => {
     if (!session?.access_token) return;
     try {
-      const res = await fetch('/api/jobs?status=published&limit=100', {
+      const res = await fetch(`${API_BASE}/api/jobs?status=published&limit=100`, {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -150,7 +151,7 @@ export function UnmatchedApplicationsView() {
     setAssignError(null);
 
     try {
-      const res = await fetch(`/api/admin/inbound-applications/${assignTarget.id}/assign`, {
+      const res = await fetch(`${API_BASE}/api/admin/inbound-applications/${assignTarget.id}/assign`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -178,7 +179,7 @@ export function UnmatchedApplicationsView() {
   const handleExecuteRetry = async (item: InboundApplicationItem) => {
     if (!session?.access_token) return;
     try {
-      const res = await fetch(`/api/admin/inbound-applications/${item.id}/retry`, {
+      const res = await fetch(`${API_BASE}/api/admin/inbound-applications/${item.id}/retry`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -199,7 +200,7 @@ export function UnmatchedApplicationsView() {
     setIgnoreLoading(true);
 
     try {
-      const res = await fetch(`/api/admin/inbound-applications/${ignoreTarget.id}/ignore`, {
+      const res = await fetch(`${API_BASE}/api/admin/inbound-applications/${ignoreTarget.id}/ignore`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
