@@ -41,6 +41,17 @@ lighthouse-*.json
 Thumbs.db
 *.zip
 
+# AI build prompts (not deployment code)
+HiredeskHR_Antigravity_*.md
+
+# Root-level ad-hoc test scripts
+test_*.mjs
+verify_*.mjs
+
+# Test-backup scripts
+scripts/test-backup-restore.mjs
+scripts/test_registration_and_isolation.mjs
+
 # Existing reference archives
 Zoo-Code-main/
 get-shit-done-main/
