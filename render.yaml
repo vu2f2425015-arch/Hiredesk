@@ -9,7 +9,7 @@ services:
     region: singapore  # Change to your preferred region
     plan: free         # free | starter | standard
     buildCommand: |
-      npm install &&
+      npm install --include=dev &&
       npx prisma generate --schema=packages/database/prisma/schema.prisma &&
       npm run build --workspace=@hiredesk/shared &&
       npm run build --workspace=@hiredesk/database &&
@@ -63,7 +63,7 @@ services:
     region: singapore
     plan: free
     buildCommand: |
-      npm install &&
+      npm install --include=dev &&
       npx prisma generate --schema=packages/database/prisma/schema.prisma &&
       npm run build --workspace=@hiredesk/shared &&
       npm run build --workspace=@hiredesk/database &&
