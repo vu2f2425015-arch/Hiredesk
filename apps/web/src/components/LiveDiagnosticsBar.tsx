@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Database, Mail, Zap, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useToast } from './Toast';
+import { API_BASE } from '../lib/config';
 
 export function LiveDiagnosticsBar() {
   const [latency, setLatency] = useState<number | null>(null);
@@ -12,7 +13,7 @@ export function LiveDiagnosticsBar() {
     setPinging(true);
     const start = performance.now();
     try {
-      const res = await fetch('/api/health');
+      const res = await fetch(`${API_BASE}/api/health`);
       const end = performance.now();
       const roundtrip = Math.round(end - start);
       setLatency(roundtrip);
