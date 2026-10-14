@@ -12,12 +12,10 @@
     "dev:worker": "npm run dev --workspace=@hiredesk/worker",
     "dev:web": "npm run dev --workspace=@hiredesk/web",
     "build": "npm run build --workspaces --if-present",
+    "vercel-build": "npx prisma generate --schema=packages/database/prisma/schema.prisma && npm run build --workspace=@hiredesk/shared && npm run build --workspace=@hiredesk/database && npm run build --workspace=@hiredesk/api && npm run build --workspace=@hiredesk/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "test:live-inbound": "node test_live_gmail_inbound.mjs",
-    "test:replay": "node test_inbound_replay_idempotency.mjs",
-    "verify:mail": "node verify_mail_services.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\""
   },
