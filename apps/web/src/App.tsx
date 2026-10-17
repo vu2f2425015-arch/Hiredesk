@@ -26,6 +26,7 @@ import { BackToTop } from './components/BackToTop';
 import { CookieBanner } from './components/CookieBanner';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { PageLoadingSkeleton } from './components/PageLoadingSkeleton';
+import { API_BASE } from './lib/config';
 
 // Code Splitting & Lazy Loaded Routes
 const DashboardView = lazy(() => import('./pages/DashboardView').then((m) => ({ default: m.DashboardView })));
@@ -112,7 +113,7 @@ function AppShell() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/health')
+    fetch(`${API_BASE}/api/health`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();

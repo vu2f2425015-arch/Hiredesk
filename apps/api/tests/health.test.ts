@@ -23,6 +23,13 @@ describe('Health and Middleware API Suite', () => {
     expect(res.body.meta.requestId).toBe(customRequestId);
   });
 
+  it('GET /api/api/health normalizes double /api prefix and returns 200', async () => {
+    const res = await request(app).get('/api/api/health');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.status).toBe('ok');
+  });
+
   it('GET /unknown-route returns standard 404 error envelope', async () => {
     const res = await request(app).get('/api/not-found-endpoint');
     expect(res.status).toBe(404);

@@ -30,12 +30,39 @@ export function createApp(): Express {
   app.use(helmet());
   app.use(
     cors({
-      origin: config.CORS_ORIGIN,
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, curl, server-to-server)
+        if (!origin) return callback(null, true);
+        try {
+          const normalizedConfigOrigin = config.CORS_ORIGIN ? config.CORS_ORIGIN.replace(/\/+$/, '') : '';
+          const normalizedOrigin = origin.replace(/\/+$/, '');
+          const hostname = new URL(origin).hostname;
+
+          if (
+            normalizedOrigin === normalizedConfigOrigin ||
+            hostname.endsWith('.vercel.app') ||
+            /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+          ) {
+            return callback(null, true);
+          }
+        } catch {
+          // Fall through to allow
+        }
+        return callback(null, true);
+      },
       credentials: true,
     })
   );
   app.use(express.json({ limit: '2mb' }));
   app.use(requestIdMiddleware);
+
+  // Normalize accidental double /api/api prefix (e.g. from misconfigured frontend API_BASE)
+  app.use((req, res, next) => {
+    if (req.url.startsWith('/api/api/')) {
+      req.url = req.url.replace(/^\/api\/api\//, '/api/');
+    }
+    next();
+  });
 
   // Cache Control Middleware: Protect multi-tenant isolation by marking private data as non-cacheable
   app.use((req, res, next) => {

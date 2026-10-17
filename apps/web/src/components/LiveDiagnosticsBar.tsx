@@ -16,8 +16,8 @@ export function LiveDiagnosticsBar() {
       const res = await fetch(`${API_BASE}/api/health`);
       const end = performance.now();
       const roundtrip = Math.round(end - start);
-      setLatency(roundtrip);
       if (res.ok) {
+        setLatency(roundtrip);
         const json = await res.json();
         if (json.data) {
           setServiceInfo({
@@ -26,6 +26,8 @@ export function LiveDiagnosticsBar() {
             env: json.data.environment,
           });
         }
+      } else {
+        setLatency(-1);
       }
     } catch {
       setLatency(-1);
