@@ -33,6 +33,7 @@ This Security Audit covers the architecture, multi-tenant isolation boundaries, 
 | **SEC-008** |  **MEDIUM**  | Data Integrity   | Controlled cleanup of partial registration failures            |   **FIXED**    |
 | **SEC-009** |   **HIGH**   | Web Security     | Permissive CORS fallback and wildcard Vercel origin exposure   |   **FIXED**    |
 | **SEC-010** |  **MEDIUM**  | Defense-in-Depth | Registration rate limiting, password bounds & role locking     |   **FIXED**    |
+| **SEC-011** | **CRITICAL** | Secrets / Auth   | Hardcoded administrator demo credentials in frontend source UI |   **FIXED**    |
 
 ---
 
@@ -117,6 +118,15 @@ This Security Audit covers the architecture, multi-tenant isolation boundaries, 
 - **Risk**: `/api/auth/register` had no IP rate limiting, potentially allowing automated brute-force account creation; passwords lacked an upper boundary check; role parameters could theoretically be injected.
 - **Remediation Applied**: Mounted `authRegisterLimiter` (10 requests per 15 min per IP, skipped in test). Updated `RegisterUserSchema` with max 128 character password bound and whitespace rejection. Hardcoded `UserRole.MANAGER` in the database transaction, strictly preventing self-assignment of `SUPER_ADMIN`.
 - **Regression Test Verification**: `apps/api/tests/authSecurity.test.ts` verifies that payloads attempting `{ role: 'super_admin' }` are constrained strictly to `manager`.
+
+#### SEC-011: Hardcoded Administrator Demo Credentials in Frontend (CRITICAL — FIXED)
+
+- **Affected File**: [apps/web/src/pages/AuthView.tsx](file:///c:/MY%20PROJECTS/Hiredesk/apps/web/src/pages/AuthView.tsx)
+- **Risk**: `AuthView.tsx` contained a quick-fill demo button populating an administrator account (`admin@hiredesk.io`) with a plaintext password. Anyone viewing the public repository could obtain these credentials.
+- **Remediation Applied**:
+  1. Rotated the password for `admin@hiredesk.io` in Supabase Auth via the Admin API to a high-entropy cryptographically generated random secret.
+  2. Completely stripped the quick-fill developer demo section and hardcoded credentials from the web UI in `AuthView.tsx`.
+  3. Configured automated test scripts (`scripts/test_registration_and_isolation.mjs`) to consume `process.env.ADMIN_PASSWORD`.
 
 ---
 

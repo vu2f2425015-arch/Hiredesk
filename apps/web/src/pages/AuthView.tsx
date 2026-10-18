@@ -13,7 +13,6 @@ import {
   User,
   Eye,
   EyeOff,
-  Sparkles,
   CheckCircle2,
   ArrowRight,
   KeyRound,
@@ -66,7 +65,6 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
   // Feedback states
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [showDemoLogins, setShowDemoLogins] = useState(false);
 
   // Sync mode with route if user navigates
   useEffect(() => {
@@ -1184,78 +1182,6 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
             </button>
           </form>
         ))}
-
-      {/* ==================================================================== */}
-      {/* Fast Test / Demo Accounts (Collapsible for developer convenience) */}
-      {/* ==================================================================== */}
-      {isConfigured && (
-        <div
-          style={{
-            marginTop: "1.75rem",
-            paddingTop: "1rem",
-            borderTop: "1px solid var(--border-subtle)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "0.75rem",
-                color: "var(--text-dim)",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.35rem",
-              }}
-            >
-              <Sparkles size={13} color="var(--primary)" /> Pre-configured
-              Testing Accounts
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowDemoLogins((v) => !v)}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--text-dim)",
-                fontSize: "0.75rem",
-                cursor: "pointer",
-                textDecoration: "underline",
-              }}
-            >
-              {showDemoLogins ? "Hide" : "Show quick fill"}
-            </button>
-          </div>
-
-          {showDemoLogins && (
-            <div
-              style={{
-                marginTop: "0.75rem",
-                display: "flex",
-                gap: "0.5rem",
-                flexWrap: "wrap",
-              }}
-            >
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ padding: "0.35rem 0.65rem", fontSize: "0.75rem" }}
-                onClick={() => {
-                  setMode("login");
-                  setEmail("admin@hiredesk.io");
-                  setPassword("AdminPassword123!");
-                }}
-              >
-                Platform Admin (admin@hiredesk.io)
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Tenant Security Notice */}
       <div
