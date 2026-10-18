@@ -1,9 +1,14 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { UserRole } from '@hiredesk/shared';
-import { registerUser } from '../lib/api';
-
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
+import { UserRole } from "@hiredesk/shared";
+import { registerUser } from "../lib/api";
 
 export interface TrustedUserProfile {
   id: string;
@@ -38,14 +43,21 @@ interface AuthContextType {
   loading: boolean;
   profileError: string | null;
   isConfigured: boolean;
-  signIn: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (
+    email: string,
+    pass: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   signUp: (params: {
     email: string;
     password: string;
     firstName: string;
     lastName: string;
     organizationName: string;
-  }) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<{
+    success: boolean;
+    requiresEmailVerification?: boolean;
+    error?: string;
+  }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -63,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = useCallback(async (token: string) => {
     try {
       setProfileError(null);
-      const res = await fetch('/api/me', {
+      const res = await fetch("/api/me", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -74,13 +86,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(json.data.user);
         setPermissions(json.data.permissions);
       } else {
-        const errorMsg = json.error?.message || 'Failed to load user profile';
+        const errorMsg = json.error?.message || "Failed to load user profile";
         setProfileError(errorMsg);
         setProfile(null);
         setPermissions(null);
       }
     } catch (err: unknown) {
-      setProfileError(err instanceof Error ? err.message : 'Network error loading profile');
+      setProfileError(
+        err instanceof Error ? err.message : "Network error loading profile",
+      );
       setProfile(null);
       setPermissions(null);
     }
@@ -97,7 +111,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       if (currentSession?.access_token) {
-        fetchProfile(currentSession.access_token).finally(() => setLoading(false));
+        fetchProfile(currentSession.access_token).finally(() =>
+          setLoading(false),
+        );
       } else {
         setLoading(false);
       }
@@ -124,11 +140,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchProfile]);
 
-  const signIn = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+  const signIn = async (
+    email: string,
+    pass: string,
+  ): Promise<{ success: boolean; error?: string }> => {
     if (!isSupabaseConfigured || !supabase) {
       return {
         success: false,
-        error: 'Supabase credentials are not configured in .env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        error:
+          "Supabase credentials are not configured in .env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
       };
     }
 
@@ -164,11 +184,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     firstName: string;
     lastName: string;
     organizationName: string;
-  }): Promise<{ success: boolean; error?: string }> => {
+  }): Promise<{
+    success: boolean;
+    requiresEmailVerification?: boolean;
+    error?: string;
+  }> => {
     if (!isSupabaseConfigured || !supabase) {
       return {
         success: false,
-        error: 'Supabase credentials are not configured in .env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+        error:
+          "Supabase credentials are not configured in .env. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.",
       };
     }
 
@@ -183,13 +208,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.clear();
       } catch {}
 
-      // 2. Sign in with the newly created account
+      // 2. Attempt sign in with the newly created account
       const loginRes = await signIn(params.email, params.password);
       if (!loginRes.success) {
         setLoading(false);
+        if (loginRes.error?.toLowerCase().includes("email not confirmed")) {
+          return {
+            success: true,
+            requiresEmailVerification: true,
+            error:
+              "Registration successful! Please check your email inbox to verify your email address before signing in.",
+          };
+        }
         return {
           success: false,
-          error: loginRes.error || 'Account created successfully, but automatic sign in failed. Please sign in manually.',
+          error:
+            loginRes.error ||
+            "Account created successfully, but automatic sign in failed. Please sign in manually.",
         };
       }
 
@@ -197,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: true };
     } catch (err: any) {
       setLoading(false);
-      const msg = err.message || 'Registration failed. Please try again.';
+      const msg = err.message || "Registration failed. Please try again.";
       setProfileError(msg);
       return { success: false, error: msg };
     }
@@ -247,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

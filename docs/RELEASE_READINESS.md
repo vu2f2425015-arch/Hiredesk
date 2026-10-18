@@ -8,25 +8,25 @@
 
 ## 1. Release Metadata & Current Verification State
 
-| Field                        | Value                                                         | Notes                                                                           |
-| :--------------------------- | :------------------------------------------------------------ | :------------------------------------------------------------------------------ |
-| **Release Version**          | `v0.9.2-staging`                                              | Verified against Performance, UI/UX, Security Audit & Clean Workspace Suite    |
-| **Monorepo Root**            | `c:\MY PROJECTS\Hiredesk`                                     | Clean working tree; zero untracked secrets                                      |
-| **Git Branch**               | `master`                                                      | Working tree verified clean with zero lint/diff errors                          |
-| **Target Architecture**      | Oracle Always Free VM + Supabase Free + DuckDNS + Gmail       | Strictly ₹0 / month budget constraint                                           |
-| **Prisma Engine Targets**    | `native`, `debian-openssl-3.0.x`, `linux-arm64-openssl-3.0.x` | Configured in `packages/database/prisma/schema.prisma`                          |
-| **Database Gateway**         | Live Supabase PostgreSQL                                      | Transaction pooler (port 6543, bounded `connection_limit=5`) & Direct (port 5432) |
-| **Inbound IMAP**             | **VERIFIED LIVE**                                             | Gmail IMAP connected via TLS 993 with Google App Password                       |
-| **Outbound SMTP**            | **VERIFIED LIVE**                                             | Gmail SMTP connected via TLS 465 with Google App Password                       |
-| **Replay Idempotency**       | **VERIFIED LIVE**                                             | 4/4 tests passed (0 duplicate candidates, applications, or resumes)             |
-| **End-to-End Acceptance**    | **15/15 Passed (100%)**                                       | `node test_phase9_e2e_acceptance.mjs` completed with exit code 0                |
-| **Clean Workspace & Reg**    | **3/3 Passed (100%)**                                         | `node scripts/test_registration_and_isolation.mjs` validated zero mock data      |
-| **Unit & Integration Suite** | **188/188 Passed (100%)**                                     | 160 API, 25 Worker, 3 Shared (`npm test`)                                       |
-| **Workspace Typecheck**      | **0 Errors**                                                  | All 5 workspaces (`api`, `web`, `worker`, `database`, `shared`)                 |
-| **Monorepo Build**           | **Clean Production Build**                                    | Initial web JS dropped 85.9% to 173 kB; 0 chunks > 500 kB                       |
-| **Lighthouse Audit**         | **SEO: 100, A11y: 98, Best: 100, Perf: 85**                   | Measured via Chrome Headless on production build preview                        |
-| **Storage Restore Drill**    | **100% SHA-256 Match**                                        | `node scripts/test-backup-restore.mjs` validated synthetic backup & restore     |
-| **Audit Reports**            | **[PERFORMANCE_AUDIT.md](file:///c:/MY%20PROJECTS/Hiredesk/docs/PERFORMANCE_AUDIT.md)** & **[UI_UX_AUDIT.md](file:///c:/MY%20PROJECTS/Hiredesk/docs/UI_UX_AUDIT.md)** | Full 15-point UI/UX and Phase 1 Performance audit documented                    |
+| Field                        | Value                                                                                                                                                                 | Notes                                                                             |
+| :--------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------- |
+| **Release Version**          | `v0.9.2-staging`                                                                                                                                                      | Verified against Performance, UI/UX, Security Audit & Clean Workspace Suite       |
+| **Monorepo Root**            | `c:\MY PROJECTS\Hiredesk`                                                                                                                                             | Clean working tree; zero untracked secrets                                        |
+| **Git Branch**               | `master`                                                                                                                                                              | Working tree verified clean with zero lint/diff errors                            |
+| **Target Architecture**      | Oracle Always Free VM + Supabase Free + DuckDNS + Gmail                                                                                                               | Strictly ₹0 / month budget constraint                                             |
+| **Prisma Engine Targets**    | `native`, `debian-openssl-3.0.x`, `linux-arm64-openssl-3.0.x`                                                                                                         | Configured in `packages/database/prisma/schema.prisma`                            |
+| **Database Gateway**         | Live Supabase PostgreSQL                                                                                                                                              | Transaction pooler (port 6543, bounded `connection_limit=5`) & Direct (port 5432) |
+| **Inbound IMAP**             | **VERIFIED LIVE**                                                                                                                                                     | Gmail IMAP connected via TLS 993 with Google App Password                         |
+| **Outbound SMTP**            | **VERIFIED LIVE**                                                                                                                                                     | Gmail SMTP connected via TLS 465 with Google App Password                         |
+| **Replay Idempotency**       | **VERIFIED LIVE**                                                                                                                                                     | 4/4 tests passed (0 duplicate candidates, applications, or resumes)               |
+| **End-to-End Acceptance**    | **15/15 Passed (100%)**                                                                                                                                               | `node test_phase9_e2e_acceptance.mjs` completed with exit code 0                  |
+| **Clean Workspace & Reg**    | **3/3 Passed (100%)**                                                                                                                                                 | `node scripts/test_registration_and_isolation.mjs` validated zero mock data       |
+| **Unit & Integration Suite** | **198/198 Passed (100%)**                                                                                                                                             | 170 API, 25 Worker, 3 Shared (`npm test`)                                         |
+| **Workspace Typecheck**      | **0 Errors**                                                                                                                                                          | All 5 workspaces (`api`, `web`, `worker`, `database`, `shared`)                   |
+| **Monorepo Build**           | **Clean Production Build**                                                                                                                                            | Initial web JS dropped 85.9% to 173 kB; 0 chunks > 500 kB                         |
+| **Lighthouse Audit**         | **SEO: 100, A11y: 98, Best: 100, Perf: 85**                                                                                                                           | Measured via Chrome Headless on production build preview                          |
+| **Storage Restore Drill**    | **100% SHA-256 Match**                                                                                                                                                | `node scripts/test-backup-restore.mjs` validated synthetic backup & restore       |
+| **Audit Reports**            | **[PERFORMANCE_AUDIT.md](file:///c:/MY%20PROJECTS/Hiredesk/docs/PERFORMANCE_AUDIT.md)** & **[UI_UX_AUDIT.md](file:///c:/MY%20PROJECTS/Hiredesk/docs/UI_UX_AUDIT.md)** | Full 15-point UI/UX and Phase 1 Performance audit documented                      |
 
 ---
 
@@ -71,7 +71,7 @@ graph TD
 1. **Tier 1 — Locally Verified**:
    - Monorepo compilation (`npm run build`) passed with zero errors.
    - Strict TypeScript typechecking across all 5 workspaces (`npm run typecheck`) passed with 0 errors.
-   - Automated test suite (`npm test`): 188 / 188 tests passed (160 API, 25 Worker, 3 Shared).
+   - Automated test suite (`npm test`): 198 / 198 tests passed (170 API, 25 Worker, 3 Shared).
    - Git repository secrets hygiene verified: zero secrets committed in Git history.
 2. **Tier 2 — Staging Verified against Live Services**:
    - Live Supabase PostgreSQL connected via transaction pooler (6543) and direct connection (5432).

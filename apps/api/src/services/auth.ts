@@ -1,6 +1,6 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { config } from '../config/index.js';
-import { logger } from '../utils/logger.js';
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { config } from "../config/index.js";
+import { logger } from "../utils/logger.js";
 
 export interface VerifiedAuthUser {
   authUserId: string;
@@ -10,8 +10,12 @@ export interface VerifiedAuthUser {
 export type TokenVerifier = (token: string) => Promise<VerifiedAuthUser | null>;
 
 let supabaseClient: SupabaseClient | null = null;
+let supabaseAdminClient: SupabaseClient | null = null;
 
-if (config.SUPABASE_URL && (config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_ANON_KEY)) {
+if (
+  config.SUPABASE_URL &&
+  (config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_ANON_KEY)
+) {
   const key = config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_ANON_KEY;
   supabaseClient = createClient(config.SUPABASE_URL, key as string, {
     auth: {
@@ -19,6 +23,19 @@ if (config.SUPABASE_URL && (config.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_
       autoRefreshToken: false,
     },
   });
+}
+
+if (config.SUPABASE_URL && config.SUPABASE_SERVICE_ROLE_KEY) {
+  supabaseAdminClient = createClient(
+    config.SUPABASE_URL,
+    config.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    },
+  );
 }
 
 interface CachedToken {
@@ -31,13 +48,15 @@ const TOKEN_CACHE_TTL_MS = 60 * 1000;
 /**
  * Default production token verifier using Supabase Auth getUser() API with in-memory caching.
  */
-const defaultVerifier: TokenVerifier = async (token: string): Promise<VerifiedAuthUser | null> => {
-  if (!token || typeof token !== 'string') {
+const defaultVerifier: TokenVerifier = async (
+  token: string,
+): Promise<VerifiedAuthUser | null> => {
+  if (!token || typeof token !== "string") {
     return null;
   }
 
   // Reject malformed or obviously expired tokens upfront
-  if (token === 'expired-token') {
+  if (token === "expired-token") {
     return null;
   }
 
@@ -51,13 +70,16 @@ const defaultVerifier: TokenVerifier = async (token: string): Promise<VerifiedAu
     try {
       const { data, error } = await supabaseClient.auth.getUser(token);
       if (error || !data.user) {
-        logger.debug({ err: error?.message }, 'Supabase token verification failed');
+        logger.debug(
+          { err: error?.message },
+          "Supabase token verification failed",
+        );
         tokenCache.delete(token);
         return null;
       }
       const verifiedUser: VerifiedAuthUser = {
         authUserId: data.user.id,
-        email: data.user.email || '',
+        email: data.user.email || "",
       };
       tokenCache.set(token, {
         user: verifiedUser,
@@ -70,18 +92,20 @@ const defaultVerifier: TokenVerifier = async (token: string): Promise<VerifiedAu
       }
       return verifiedUser;
     } catch (err) {
-      logger.error({ err }, 'Error during Supabase token verification');
+      logger.error({ err }, "Error during Supabase token verification");
       return null;
     }
   }
 
   // If Supabase credentials are not configured, reject unless running in test mode with mock tokens
-  if (config.NODE_ENV === 'test') {
-    logger.warn('Token verifier invoked without Supabase credentials in test environment');
+  if (config.NODE_ENV === "test") {
+    logger.warn(
+      "Token verifier invoked without Supabase credentials in test environment",
+    );
     return null;
   }
 
-  logger.warn('Supabase credentials are not configured on the server');
+  logger.warn("Supabase credentials are not configured on the server");
   return null;
 };
 
@@ -97,11 +121,25 @@ export function resetTokenVerifier(): void {
   activeVerifier = defaultVerifier;
 }
 
-export async function verifyToken(token: string): Promise<VerifiedAuthUser | null> {
+export async function verifyToken(
+  token: string,
+): Promise<VerifiedAuthUser | null> {
   return activeVerifier(token);
 }
 
-export function getSupabaseAdminClient(): SupabaseClient | null {
-  return supabaseClient;
+let customAdminClient: SupabaseClient | null | undefined = undefined;
+
+export function setSupabaseAdminClient(client: SupabaseClient | null): void {
+  customAdminClient = client;
 }
 
+export function resetSupabaseAdminClient(): void {
+  customAdminClient = undefined;
+}
+
+export function getSupabaseAdminClient(): SupabaseClient | null {
+  if (customAdminClient !== undefined) {
+    return customAdminClient;
+  }
+  return supabaseAdminClient;
+}
