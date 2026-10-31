@@ -26,6 +26,12 @@ import { sendError } from "./utils/response.js";
 export function createApp(): Express {
   const app = express();
 
+  // The API is deployed behind one trusted hosting proxy. This lets IP-based
+  // rate limiters use the forwarded client address instead of the proxy IP.
+  if (config.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+  }
+
   // Standard Security & Utility Middlewares
   app.use(helmet());
   // Explicit CORS allowlist validation

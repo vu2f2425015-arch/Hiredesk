@@ -43,7 +43,7 @@ interface CachedToken {
   expiresAt: number;
 }
 const tokenCache = new Map<string, CachedToken>();
-const TOKEN_CACHE_TTL_MS = 60 * 1000;
+const TOKEN_CACHE_TTL_MS = 10 * 1000;
 
 /**
  * Default production token verifier using Supabase Auth getUser() API with in-memory caching.

@@ -1203,8 +1203,8 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
           <ShieldCheck size={13} color="var(--success)" /> Strict Multi-Tenant
           Isolation
         </span>
-        &bull; Agency data, candidate notes, and client portals are
-        cryptographically partitioned.
+        &bull; Agency data, candidate notes, and client portals are scoped by
+        server-side role and tenant checks.
       </div>
     </div>
   );

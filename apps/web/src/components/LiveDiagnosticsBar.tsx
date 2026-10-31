@@ -9,7 +9,7 @@ export function LiveDiagnosticsBar() {
   const [serviceInfo, setServiceInfo] = useState<{ uptime: number; version: string; env: string } | null>(null);
   const { success } = useToast();
 
-  const pingApi = async () => {
+  const pingApi = async (): Promise<boolean> => {
     setPinging(true);
     const start = performance.now();
     try {
@@ -26,11 +26,14 @@ export function LiveDiagnosticsBar() {
             env: json.data.environment,
           });
         }
+        return true;
       } else {
         setLatency(-1);
+        return false;
       }
     } catch {
       setLatency(-1);
+      return false;
     } finally {
       setPinging(false);
     }
@@ -65,30 +68,30 @@ export function LiveDiagnosticsBar() {
           </span>
         </div>
 
-        {/* Supabase DB */}
+        {/* The public health endpoint does not currently probe the database. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <Database size={14} color="var(--accent-cyan)" />
-          <span style={{ color: 'var(--text-dim)' }}>Database:</span>
-          <span style={{ fontWeight: 600, color: 'var(--success)' }}>
-            Supabase PostgreSQL (Active)
+          <span style={{ color: 'var(--text-dim)' }}>Database check:</span>
+          <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>
+            Not exposed
           </span>
         </div>
 
-        {/* Mail Gateways */}
+        {/* The API health endpoint cannot verify the separate IMAP worker or SMTP delivery. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
           <Mail size={14} color="var(--accent-violet)" />
-          <span style={{ color: 'var(--text-dim)' }}>Mail Daemon:</span>
-          <span style={{ fontWeight: 600, color: 'var(--success)' }}>
-            Gmail TLS 993/465 Verified
+          <span style={{ color: 'var(--text-dim)' }}>Mail worker:</span>
+          <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>
+            Status not exposed
           </span>
         </div>
 
         {/* Tenant Isolation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <ShieldCheck size={14} color="var(--success)" />
-          <span style={{ color: 'var(--text-dim)' }}>Isolation:</span>
+          <ShieldCheck size={14} color="var(--text-dim)" />
+          <span style={{ color: 'var(--text-dim)' }}>Tenant access:</span>
           <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-            Multi-Tenant Enforced
+            Backend scoped
           </span>
         </div>
       </div>
@@ -102,8 +105,9 @@ export function LiveDiagnosticsBar() {
         <button
           className="btn btn-secondary"
           onClick={() => {
-            pingApi();
-            success('Measured live API latency!');
+            void pingApi().then((reachable) => {
+              if (reachable) success('API responded to the health check.');
+            });
           }}
           disabled={pinging}
           style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
