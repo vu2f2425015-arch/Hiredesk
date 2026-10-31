@@ -282,6 +282,21 @@ describe("Urgent Authentication Security Regression Test Suite", () => {
       );
     });
 
+    it("Allows requests from deployed frontend https://hiredesk-smoky.vercel.app in production mode", async () => {
+      const originalEnv = config.NODE_ENV;
+      try {
+        (config as any).NODE_ENV = "production";
+        const res = await request(app)
+          .get("/api/health")
+          .set("Origin", "https://hiredesk-smoky.vercel.app");
+
+        expect(res.status).toBe(200);
+        expect(res.headers["access-control-allow-origin"]).toBe("https://hiredesk-smoky.vercel.app");
+      } finally {
+        (config as any).NODE_ENV = originalEnv;
+      }
+    });
+
     it("In production mode, rejects wildcard *.vercel.app origins that are not configured in CORS_ORIGIN", async () => {
       const originalEnv = config.NODE_ENV;
       const originalCors = config.CORS_ORIGIN;

@@ -6,9 +6,18 @@ declare global {
 }
 
 const rawDbUrl = process.env.DATABASE_URL;
-const configuredDbUrl = rawDbUrl && !rawDbUrl.includes('connection_limit=')
-  ? (rawDbUrl.includes('?') ? `${rawDbUrl}&connection_limit=5` : `${rawDbUrl}?connection_limit=5`)
-  : rawDbUrl;
+let configuredDbUrl = rawDbUrl;
+if (configuredDbUrl) {
+  if (!configuredDbUrl.includes('connection_limit=')) {
+    configuredDbUrl = configuredDbUrl.includes('?') ? `${configuredDbUrl}&connection_limit=5` : `${configuredDbUrl}?connection_limit=5`;
+  }
+  if (!configuredDbUrl.includes('connect_timeout=')) {
+    configuredDbUrl = `${configuredDbUrl}&connect_timeout=15`;
+  }
+  if (!configuredDbUrl.includes('pool_timeout=')) {
+    configuredDbUrl = `${configuredDbUrl}&pool_timeout=15`;
+  }
+}
 
 export const prisma =
   global.prismaGlobal ||

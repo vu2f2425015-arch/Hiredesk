@@ -29,6 +29,46 @@ export function errorHandler(
     return;
   }
 
+  // Handle database connectivity failures (PrismaClientInitializationError / P1001 / connection timeout / ENOTFOUND / paused Supabase)
+  const errCode = (err as any).code;
+  const errMsg = (err.message || '').toLowerCase();
+  const isDbConnectionError =
+    err.name === 'PrismaClientInitializationError' ||
+    err.name === 'PrismaClientRustPanicError' ||
+    errCode === 'P1001' ||
+    errCode === 'P1002' ||
+    errCode === 'P1008' ||
+    errCode === 'P1017' ||
+    errMsg.includes("can't reach database server") ||
+    errMsg.includes("cant reach database server") ||
+    errMsg.includes('database server is running') ||
+    errMsg.includes('pooler.supabase.com') ||
+    errMsg.includes('tenant') ||
+    errMsg.includes('connection timed out') ||
+    errMsg.includes('getaddrinfo enotfound');
+
+  if (isDbConnectionError) {
+    logger.error(
+      {
+        requestId,
+        err: {
+          name: err.name,
+          code: errCode,
+          message: err.message,
+        },
+      },
+      'Database connectivity error'
+    );
+
+    sendError(
+      res,
+      'DATABASE_UNAVAILABLE',
+      'Database server is unreachable. If using Supabase free tier, your project may be paused after a period of inactivity. Please resume your project in the Supabase Dashboard.',
+      503
+    );
+    return;
+  }
+
   if ((err as any).statusCode) {
     sendError(res, (err as any).code || 'BAD_REQUEST', err.message, (err as any).statusCode);
     return;

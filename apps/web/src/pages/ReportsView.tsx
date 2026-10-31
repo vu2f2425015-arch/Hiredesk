@@ -172,9 +172,10 @@ export function ReportsView() {
           alignItems: 'center',
           flexWrap: 'wrap',
           padding: '0.85rem 1.25rem',
-          background: 'rgba(255, 255, 255, 0.03)',
-          border: '1px solid var(--border-subtle)',
-          borderRadius: '10px',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-default)',
+          borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-sm)',
           marginBottom: '2rem',
         }}
       >
@@ -254,13 +255,26 @@ export function ReportsView() {
         </div>
       )}
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
-          <RefreshCw size={32} className="spin" style={{ margin: '0 auto 1rem', display: 'block', opacity: 0.5 }} />
-          <p>Compiling database report aggregations...</p>
-        </div>
-      ) : (
-        <>
+      {(() => {
+        const hasCurrentData = Boolean(
+          (activeTab === 'funnel' && funnelData) ||
+          (activeTab === 'time_to_hire' && timeToHireData) ||
+          (activeTab === 'sources' && sourcesData) ||
+          (activeTab === 'productivity' && productivityData) ||
+          (activeTab === 'job_outcomes' && jobOutcomesData)
+        );
+
+        if (loading && !hasCurrentData) {
+          return (
+            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-xl)' }}>
+              <RefreshCw size={28} className="spin-icon" style={{ margin: '0 auto 1rem', display: 'block', color: 'var(--primary)' }} />
+              <p style={{ margin: 0, fontWeight: 500 }}>Compiling database report aggregations...</p>
+            </div>
+          );
+        }
+
+        return (
+          <>
           {/* TAB 1: FUNNEL REPORT */}
           {activeTab === 'funnel' && funnelData && (
             <div>
@@ -272,19 +286,19 @@ export function ReportsView() {
                   marginBottom: '2rem',
                 }}
               >
-                <div className="card" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total Applications</span>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, marginTop: '0.25rem' }}>
                     {funnelData.totalApplications}
                   </div>
                 </div>
-                <div className="card" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Hired Candidates</span>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, marginTop: '0.25rem', color: '#10b981' }}>
                     {funnelData.stages.find((s) => s.stage === 'Hired')?.count || 0}
                   </div>
                 </div>
-                <div className="card" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Overall Conversion Rate</span>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, marginTop: '0.25rem', color: 'var(--primary)' }}>
                     {funnelData.stages.find((s) => s.stage === 'Hired')?.conversionFromApplied || 0}%
@@ -292,7 +306,7 @@ export function ReportsView() {
                 </div>
               </div>
 
-              <div className="card" style={{ padding: '1.75rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+              <div className="card" style={{ padding: '1.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.5rem' }}>
                   Stage-by-Stage Conversion Funnel
                 </h3>
@@ -311,8 +325,9 @@ export function ReportsView() {
                           style={{
                             padding: '1rem 1.25rem',
                             borderRadius: '8px',
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            border: '1px solid var(--border-subtle)',
+                            background: 'var(--bg-surface)',
+                            border: '1px solid var(--border-default)',
+                            boxShadow: 'var(--shadow-sm)',
                           }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -381,31 +396,31 @@ export function ReportsView() {
                   marginBottom: '2rem',
                 }}
               >
-                <div className="card" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Hired Sample Size</span>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, marginTop: '0.25rem' }}>
                     {timeToHireData.totalHired}
                   </div>
                 </div>
-                <div className="card" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Average Days to Hire</span>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, marginTop: '0.25rem', color: 'var(--primary)' }}>
                     {timeToHireData.averageDaysToHire} days
                   </div>
                 </div>
-                <div className="card" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Median Days to Hire</span>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, marginTop: '0.25rem' }}>
                     {timeToHireData.medianDaysToHire} days
                   </div>
                 </div>
-                <div className="card" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Fastest Hire</span>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, marginTop: '0.25rem', color: '#10b981' }}>
                     {timeToHireData.fastestDaysToHire} days
                   </div>
                 </div>
-                <div className="card" style={{ padding: '1.25rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Slowest Hire</span>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, marginTop: '0.25rem', color: '#f59e0b' }}>
                     {timeToHireData.slowestDaysToHire} days
@@ -422,7 +437,7 @@ export function ReportsView() {
                   </p>
                 </div>
               ) : (
-                <div className="card" style={{ padding: '1.75rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+                <div className="card" style={{ padding: '1.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                   <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.5rem' }}>
                     Average Days Spent Per Pipeline Stage
                   </h3>
@@ -433,8 +448,9 @@ export function ReportsView() {
                         style={{
                           padding: '1rem',
                           borderRadius: '8px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid var(--border-subtle)',
+                          background: 'var(--bg-surface)',
+                          border: '1px solid var(--border-default)',
+                          boxShadow: 'var(--shadow-sm)',
                         }}
                       >
                         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{sa.stage}</div>
@@ -452,7 +468,7 @@ export function ReportsView() {
           {/* TAB 3: SOURCES REPORT */}
           {activeTab === 'sources' && sourcesData && (
             <div>
-              <div className="card" style={{ padding: '1.75rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+              <div className="card" style={{ padding: '1.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.5rem' }}>
                   Candidate Acquisition Channels & Conversion
                 </h3>
@@ -477,7 +493,7 @@ export function ReportsView() {
                         {sourcesData.sources.map((src) => {
                           const hireRate = src.count > 0 ? Math.round((src.hiredCount / src.count) * 1000) / 10 : 0;
                           return (
-                            <tr key={src.source} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                            <tr key={src.source} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                               <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>{src.source}</td>
                               <td style={{ padding: '0.85rem 1rem' }}>{src.count}</td>
                               <td style={{ padding: '0.85rem 1rem' }}>{src.percentage}%</td>
@@ -512,7 +528,7 @@ export function ReportsView() {
           {/* TAB 4: RECRUITER PRODUCTIVITY */}
           {activeTab === 'productivity' && productivityData && (
             <div>
-              <div className="card" style={{ padding: '1.75rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+              <div className="card" style={{ padding: '1.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.5rem' }}>
                   Recruiter Operational Output (Audited Database Actions)
                 </h3>
@@ -535,7 +551,7 @@ export function ReportsView() {
                       </thead>
                       <tbody>
                         {productivityData.recruiters.map((r) => (
-                          <tr key={r.recruiterId} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                          <tr key={r.recruiterId} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                             <td style={{ padding: '0.85rem 1rem', fontWeight: 600 }}>{r.recruiterName || 'Unnamed'}</td>
                             <td style={{ padding: '0.85rem 1rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>{r.email}</td>
                             <td style={{ padding: '0.85rem 1rem' }}>
@@ -564,7 +580,7 @@ export function ReportsView() {
           {/* TAB 5: JOB OUTCOMES */}
           {activeTab === 'job_outcomes' && jobOutcomesData && (
             <div>
-              <div className="card" style={{ padding: '1.75rem', background: 'rgba(255, 255, 255, 0.02)' }}>
+              <div className="card" style={{ padding: '1.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1.5rem' }}>
                   Per-Job Pipeline Outcomes & Yield
                 </h3>
@@ -589,7 +605,7 @@ export function ReportsView() {
                       </thead>
                       <tbody>
                         {jobOutcomesData.jobs.map((job) => (
-                          <tr key={job.jobId} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                          <tr key={job.jobId} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                             <td style={{ padding: '0.85rem 1rem' }}>
                               <div style={{ fontWeight: 600 }}>{job.title}</div>
                               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{job.jobCode}</div>
@@ -616,7 +632,8 @@ export function ReportsView() {
             </div>
           )}
         </>
-      )}
+        );
+      })()}
     </div>
   );
 }

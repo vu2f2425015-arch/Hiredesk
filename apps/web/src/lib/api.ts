@@ -1779,3 +1779,21 @@ export async function evaluateCandidateMatch(
   return json.data;
 }
 
+
+export async function resendVerificationEmail(email: string): Promise<{ success: boolean; message: string }> {
+  const res = await apiFetch('/api/auth/resend-verification', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error?.message || 'Failed to resend verification email');
+  }
+  return {
+    success: true,
+    message: json.data?.message || 'Verification email sent. Please check your inbox.',
+  };
+}

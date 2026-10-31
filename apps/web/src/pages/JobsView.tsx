@@ -282,7 +282,9 @@ export function JobsView() {
         </div>
       ) : jobs.length === 0 ? (
         <div className="empty-state">
-          <Briefcase className="empty-icon" size={48} />
+          <div className="empty-icon-wrap">
+            <Briefcase size={26} />
+          </div>
           <h2 className="empty-title">No Job Openings Found</h2>
           <p className="empty-desc">
             {search || statusFilter
@@ -290,7 +292,7 @@ export function JobsView() {
               : 'Your agency has not created any job vacancies yet. Click "Create Job" to generate your first vacancy with an atomic Job Code.'}
           </p>
           {canCreate && (
-            <button className="btn btn-primary" onClick={() => setIsCreateOpen(true)}>
+            <button className="button-primary" onClick={() => setIsCreateOpen(true)} style={{ margin: '0 auto' }}>
               <Plus size={16} /> Create Job Opening
             </button>
           )}

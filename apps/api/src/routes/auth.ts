@@ -5,6 +5,7 @@ import { prisma } from "@hiredesk/database";
 import { RegisterUserSchema, UserRole } from "@hiredesk/shared";
 import { config } from "../config/index.js";
 import { getSupabaseAdminClient } from "../services/auth.js";
+import { EmailService } from "../services/email.js";
 import { sendSuccess, sendError } from "../utils/response.js";
 import { logger } from "../utils/logger.js";
 
@@ -203,6 +204,61 @@ authRouter.post(
           "Successfully registered new agency organization and manager",
         );
 
+        // Dispatch verification email via Gmail SMTP
+        if (supabaseAdmin) {
+          try {
+            const redirectUrl = `${config.APP_PUBLIC_URL || "http://localhost:5173"}/login?verified=true`;
+            const { data: linkData } =
+              await supabaseAdmin.auth.admin.generateLink({
+                type: "signup",
+                email: normalizedEmail,
+                password,
+                options: {
+                  redirectTo: redirectUrl,
+                },
+              });
+
+            if (linkData?.properties?.action_link) {
+              const verifyUrl = linkData.properties.action_link;
+              await EmailService.sendMail({
+                to: normalizedEmail,
+                subject: "Verify your HiredeskHR account",
+                text: `Welcome to HiredeskHR! Please verify your email by clicking: ${verifyUrl}`,
+                html: `
+                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+                    <div style="margin-bottom: 24px;">
+                      <h1 style="color: #4f46e5; font-size: 22px; font-weight: 700; margin: 0 0 8px 0;">Welcome to HiredeskHR</h1>
+                      <p style="color: #64748b; font-size: 14px; margin: 0;">Enterprise Agency Recruitment Workspace</p>
+                    </div>
+                    <p style="color: #1e293b; font-size: 15px; line-height: 1.6; margin: 0 0 16px 0;">
+                      Hi ${firstName.trim()}, thank you for registering your agency workspace (<strong>${organizationName.trim()}</strong>).
+                    </p>
+                    <p style="color: #1e293b; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
+                      Please verify your email address to activate your account and start managing your vacancies and candidate pipelines.
+                    </p>
+                    <div style="margin: 28px 0; text-align: center;">
+                      <a href="${verifyUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+                        Verify Email Address &rarr;
+                      </a>
+                    </div>
+                    <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 24px 0 0 0;">
+                      If the button above doesn't work, copy and paste this verification URL into your browser:<br/>
+                      <a href="${verifyUrl}" style="color: #4f46e5; word-break: break-all;">${verifyUrl}</a>
+                    </p>
+                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+                    <p style="color: #94a3b8; font-size: 11px; margin: 0;">
+                      If you did not request this registration, you can safely ignore this email.
+                    </p>
+                  </div>
+                `,
+              });
+              logger.info({ email: normalizedEmail }, "Dispatched verification email via Gmail SMTP");
+            }
+          } catch (mailErr: any) {
+            logger.warn({ err: mailErr.message, email: normalizedEmail }, "Failed to send registration verification email");
+          }
+        }
+
         sendSuccess(
           res,
           {
@@ -250,6 +306,95 @@ authRouter.post(
       }
     } catch (err: any) {
       logger.error({ err }, "Unhandled error during registration");
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/auth/resend-verification
+ * Resends the account verification email to the user's email address.
+ */
+authRouter.post(
+  "/auth/resend-verification",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { email } = req.body;
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        sendError(res, "VALIDATION_ERROR", "A valid email address is required", 400);
+        return;
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const supabaseAdmin = getSupabaseAdminClient();
+      if (!supabaseAdmin) {
+        sendError(res, "AUTH_ERROR", "Authentication service is unavailable", 503);
+        return;
+      }
+
+      let verificationLink: string | null = null;
+      const redirectUrl = `${config.APP_PUBLIC_URL || "http://localhost:5173"}/login?verified=true`;
+
+      // 1. Generate magiclink to activate/verify the user's account
+      const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+        type: "magiclink",
+        email: normalizedEmail,
+        options: {
+          redirectTo: redirectUrl,
+        },
+      });
+
+      if (linkData?.properties?.action_link) {
+        verificationLink = linkData.properties.action_link;
+      }
+
+      if (verificationLink) {
+        await EmailService.sendMail({
+          to: normalizedEmail,
+          subject: "Verify your HiredeskHR account",
+          text: `Please verify your email address by clicking: ${verificationLink}`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
+              <div style="margin-bottom: 24px;">
+                <h1 style="color: #4f46e5; font-size: 22px; font-weight: 700; margin: 0 0 8px 0;">Verify Your Email Address</h1>
+                <p style="color: #64748b; font-size: 14px; margin: 0;">HiredeskHR Workspace Activation</p>
+              </div>
+              <p style="color: #1e293b; font-size: 15px; line-height: 1.6; margin: 0 0 16px 0;">
+                You requested a new verification link for your HiredeskHR account.
+              </p>
+              <p style="color: #1e293b; font-size: 15px; line-height: 1.6; margin: 0 0 24px 0;">
+                Click the button below to verify your email and activate your workspace:
+              </p>
+              <div style="margin: 28px 0; text-align: center;">
+                <a href="${verificationLink}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+                  Verify Email Address &rarr;
+                </a>
+              </div>
+              <p style="color: #64748b; font-size: 12px; line-height: 1.5; margin: 24px 0 0 0;">
+                If the button above doesn't work, copy and paste this verification URL into your browser:<br/>
+                <a href="${verificationLink}" style="color: #4f46e5; word-break: break-all;">${verificationLink}</a>
+              </p>
+              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+              <p style="color: #94a3b8; font-size: 11px; margin: 0;">
+                If you did not request this email, please disregard it.
+              </p>
+            </div>
+          `,
+        });
+        logger.info({ email: normalizedEmail }, "Resent verification email via Gmail SMTP");
+      } else {
+        // Supabase native resend fallback
+        await supabaseAdmin.auth.resend({
+          type: "signup",
+          email: normalizedEmail,
+        });
+      }
+
+      sendSuccess(res, {
+        message: "Verification email sent. Please check your inbox and spam folder.",
+      });
+    } catch (err: any) {
+      logger.error({ err: err.message }, "Failed to resend verification email");
       next(err);
     }
   },
