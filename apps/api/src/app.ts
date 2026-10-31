@@ -37,8 +37,17 @@ export function createApp(): Express {
   // Explicit CORS allowlist validation
   const getAllowedOrigins = (): Set<string> => {
     const allowed = new Set<string>();
+    // Known production deployment origins
+    allowed.add("https://hiredesk-smoky.vercel.app");
+
     if (config.CORS_ORIGIN) {
       config.CORS_ORIGIN.split(",")
+        .map((o) => o.trim().replace(/\/+$/, ""))
+        .filter(Boolean)
+        .forEach((o) => allowed.add(o));
+    }
+    if (config.APP_PUBLIC_URL) {
+      config.APP_PUBLIC_URL.split(",")
         .map((o) => o.trim().replace(/\/+$/, ""))
         .filter(Boolean)
         .forEach((o) => allowed.add(o));

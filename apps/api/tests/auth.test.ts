@@ -8,6 +8,12 @@ import { UserRole } from '@hiredesk/shared';
 // Mock the @hiredesk/database module
 vi.mock('@hiredesk/database', () => {
   const mockPrisma = {
+    $transaction: vi.fn(async (cb: any) => {
+      if (typeof cb === 'function') {
+        return cb(mockPrisma);
+      }
+      return cb;
+    }),
     userProfile: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
