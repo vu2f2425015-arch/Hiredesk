@@ -36,46 +36,63 @@ bootstrapRouter.post('/bootstrap/super-admin', async (req: Request, res: Respons
     return;
   }
 
-  // 2. Verify no super_admin exists yet
-  const existingSuperAdmin = await prisma.userProfile.findFirst({
-    where: { role: UserRole.SUPER_ADMIN },
-  });
+  // Check and create at serializable isolation so two simultaneous valid
+  // bootstrap requests cannot both observe an empty admin table and succeed.
+  let profile;
+  try {
+    profile = await prisma.$transaction(
+      async (tx) => {
+        const existingSuperAdmin = await tx.userProfile.findFirst({
+          where: { role: UserRole.SUPER_ADMIN },
+        });
 
-  if (existingSuperAdmin) {
-    logger.warn({ existingAdminId: existingSuperAdmin.id }, 'Refused bootstrap: super_admin already exists');
-    sendError(
-      res,
-      'CONFLICT',
-      'Platform super-admin has already been bootstrapped. Use administrative APIs.',
-      409
+        if (existingSuperAdmin) {
+          const err = new Error('Platform super-admin has already been bootstrapped. Use administrative APIs.');
+          (err as any).code = 'BOOTSTRAP_ALREADY_COMPLETED';
+          throw err;
+        }
+
+        const existingProfile = await tx.userProfile.findUnique({ where: { authUserId } });
+        if (existingProfile) {
+          const err = new Error('User profile already exists for this Supabase Auth ID');
+          (err as any).code = 'PROFILE_ALREADY_EXISTS';
+          throw err;
+        }
+
+        return tx.userProfile.create({
+          data: {
+            authUserId,
+            email,
+            firstName,
+            lastName,
+            fullName: `${firstName} ${lastName}`,
+            role: UserRole.SUPER_ADMIN,
+            organizationId: null,
+            clientId: null,
+            isActive: true,
+          },
+        });
+      },
+      { isolationLevel: 'Serializable' }
     );
-    return;
+  } catch (err: any) {
+    if (err.code === 'BOOTSTRAP_ALREADY_COMPLETED') {
+      logger.warn('Refused bootstrap: super_admin already exists');
+      sendError(res, 'CONFLICT', err.message, 409);
+      return;
+    }
+    if (err.code === 'PROFILE_ALREADY_EXISTS') {
+      sendError(res, 'CONFLICT', err.message, 409);
+      return;
+    }
+    // Prisma uses P2034 for a serializable transaction conflict. Treat a
+    // concurrent bootstrap loser as an already-completed bootstrap.
+    if (err.code === 'P2034') {
+      sendError(res, 'CONFLICT', 'Platform super-admin has already been bootstrapped.', 409);
+      return;
+    }
+    throw err;
   }
-
-  // 3. Check if this authUserId already has a profile
-  const existingProfile = await prisma.userProfile.findUnique({
-    where: { authUserId },
-  });
-
-  if (existingProfile) {
-    sendError(res, 'CONFLICT', 'User profile already exists for this Supabase Auth ID', 409);
-    return;
-  }
-
-  // 4. Atomically create the initial super_admin profile
-  const profile = await prisma.userProfile.create({
-    data: {
-      authUserId,
-      email,
-      firstName,
-      lastName,
-      fullName: `${firstName} ${lastName}`,
-      role: UserRole.SUPER_ADMIN,
-      organizationId: null,
-      clientId: null,
-      isActive: true,
-    },
-  });
 
   logger.info({ profileId: profile.id, email }, 'Platform super-admin successfully bootstrapped');
 

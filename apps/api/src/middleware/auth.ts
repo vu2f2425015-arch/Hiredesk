@@ -37,7 +37,7 @@ interface CachedProfile {
   expiresAt: number;
 }
 const profileCache = new Map<string, CachedProfile>();
-const PROFILE_CACHE_TTL_MS = 60 * 1000;
+const PROFILE_CACHE_TTL_MS = 10 * 1000;
 
 export function clearProfileCache(): void {
   profileCache.clear();

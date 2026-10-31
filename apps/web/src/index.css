@@ -944,4 +944,45 @@ textarea:focus-visible {
   }
 }
 
+@media (max-width: 720px) {
+  .navbar {
+    gap: 0.5rem;
+    padding: 0 0.65rem;
+  }
+
+  .navbar > div:first-child {
+    min-width: 0;
+    gap: 0.5rem !important;
+  }
+
+  .brand {
+    gap: 0.35rem;
+    font-size: 1rem;
+  }
+
+  .brand-badge {
+    display: none;
+  }
+
+  .nav-search-trigger {
+    width: 38px;
+    flex: 0 0 38px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .nav-search-trigger .kbd-pill {
+    display: none;
+  }
+
+  .navbar > div:last-child {
+    min-width: 0;
+    gap: 0.35rem !important;
+  }
+
+  .navbar > div:last-child > a[title="System Diagnostics"] {
+    padding: 0.2rem 0.35rem !important;
+  }
+}
+
 

@@ -1,6 +1,6 @@
 # HiredeskHR — Multi-Tenant Recruitment Agency ATS
 
-HiredeskHR is a real, production-minded Applicant Tracking System (ATS) engineered specifically for recruitment agencies managing hiring pipelines across multiple client companies.
+HiredeskHR is a multi-tenant Applicant Tracking System (ATS) project for recruitment agencies managing hiring pipelines across multiple client companies. It is deployed as a demonstration environment; production readiness requirements are tracked in the release-readiness document.
 
 ---
 
@@ -73,15 +73,11 @@ npm run dev:worker  # IMAP Ingestion Worker
 
 ---
 
-## Phased Development Roadmap
+## Current project status
 
-- [x] **Phase 0 — Monorepo Scaffold & Standards**
-- [x] **Phase 1 — Supabase Auth, Profiles & Tenant Authorization**
-- [x] **Phase 2 — Jobs & Atomic Global Job Codes**
-- [x] **Phase 3 — Candidate, Application & Public Career Portal**
-- [x] **Phase 4 — Email Ingestion Worker & Unmatched Queue**
-- [x] **Phase 5 — Recruiter Dashboard, Candidate Profile & Pipeline**
-- [x] **Phase 6 — Client Portal & Isolation Hardening**
-- [x] **Phase 7 — Interviews, Calendar Events & SMTP Communications Outbox**
-- [ ] **Phase 8 — Talent Pool, Analytics & Decision Support** (Post-MVP)
+The repository includes the recruiter dashboard, job and application pipelines, public career pages, client portal, inbound email worker, interviews and communications, talent pool, analytics, notifications, and AI-assisted recruiter endpoints.
+
+The public deployment is a demonstration environment. Its API health route confirms that the API process responds; it does not currently report database connectivity, email worker status, or SMTP delivery status. Do not treat the landing-page/API health indicator as a production readiness or data-protection certification.
+
+See [Release Readiness](docs/RELEASE_READINESS.md) for the current deployment checks and remaining pilot requirements. Build, typecheck, and test commands above are instructions; their results should be recorded with a date and commit whenever they are run.
 
