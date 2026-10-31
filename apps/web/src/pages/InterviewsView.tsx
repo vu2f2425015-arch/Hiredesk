@@ -877,10 +877,10 @@ export function InterviewsView() {
               </div>
             )}
 
-            <form onSubmit={handleScheduleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                <div>
-                  <label className="label">Date</label>
+            <form onSubmit={handleScheduleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="label">Date *</label>
                   <input
                     type="date"
                     className="input"
@@ -890,8 +890,8 @@ export function InterviewsView() {
                   />
                 </div>
 
-                <div>
-                  <label className="label">Time Zone</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="label">Time Zone *</label>
                   <input
                     type="text"
                     className="input"
@@ -900,9 +900,11 @@ export function InterviewsView() {
                     onChange={(e) => setScheduleForm({ ...scheduleForm, timeZone: e.target.value })}
                   />
                 </div>
+              </div>
 
-                <div>
-                  <label className="label">Start Time</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="label">Start Time *</label>
                   <input
                     type="time"
                     className="input"
@@ -912,8 +914,8 @@ export function InterviewsView() {
                   />
                 </div>
 
-                <div>
-                  <label className="label">End Time</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="label">End Time *</label>
                   <input
                     type="time"
                     className="input"
@@ -924,8 +926,8 @@ export function InterviewsView() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '0.75rem' }}>
-                <label className="label">Assigned Interviewer</label>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="label">Assigned Interviewer *</label>
                 <select
                   className="input"
                   required
@@ -935,14 +937,14 @@ export function InterviewsView() {
                   <option value="">Select Interviewer...</option>
                   {interviewers.map((i) => (
                     <option key={i.id} value={i.id}>
-                      {i.fullName || `${i.firstName} ${i.lastName}`} ({i.role})
+                      {i.fullName || `${i.firstName} ${i.lastName}`} ({i.role.replace('_', ' ')})
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
                   <label className="label">Interview Format</label>
                   <select
                     className="input"
@@ -957,7 +959,7 @@ export function InterviewsView() {
                   </select>
                 </div>
 
-                <div>
+                <div className="form-group" style={{ margin: 0 }}>
                   <label className="label">Meeting Provider</label>
                   <select
                     className="input"
@@ -973,33 +975,34 @@ export function InterviewsView() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '0.75rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
                 <label className="label">Meeting URL</label>
                 <input
                   type="url"
                   className="input"
-                  placeholder="https://meet.google.com/xyz"
+                  placeholder="https://meet.google.com/xyz-abc-def"
                   value={scheduleForm.meetingUrl}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, meetingUrl: e.target.value })}
                 />
               </div>
 
-              <div style={{ marginBottom: '1.25rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
                 <label className="label">Internal Recruiter Notes (Confidential)</label>
                 <textarea
                   className="input"
-                  rows={2}
-                  placeholder="Private notes (never visible to candidate or client)..."
+                  rows={3}
+                  placeholder="Private notes for the hiring team (never visible to candidate or client)..."
                   value={scheduleForm.interviewerNotes}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, interviewerNotes: e.target.value })}
+                  style={{ resize: 'vertical' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setIsScheduleOpen(false)}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-default)' }}>
+                <button type="button" className="button-secondary" onClick={() => setIsScheduleOpen(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                <button type="submit" className="button-primary" disabled={submitting}>
                   {submitting ? 'Scheduling...' : 'Schedule & Dispatch Email'}
                 </button>
               </div>
@@ -1022,10 +1025,10 @@ export function InterviewsView() {
               </div>
             )}
 
-            <form onSubmit={handleRescheduleSubmit}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                <div>
-                  <label className="label">New Date</label>
+            <form onSubmit={handleRescheduleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="label">New Date *</label>
                   <input
                     type="date"
                     className="input"
@@ -1034,8 +1037,8 @@ export function InterviewsView() {
                     onChange={(e) => setRescheduleForm({ ...rescheduleForm, startDate: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="label">Time Zone</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="label">Time Zone *</label>
                   <input
                     type="text"
                     className="input"
@@ -1044,8 +1047,8 @@ export function InterviewsView() {
                     onChange={(e) => setRescheduleForm({ ...rescheduleForm, timeZone: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="label">Start Time</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="label">Start Time *</label>
                   <input
                     type="time"
                     className="input"
@@ -1054,8 +1057,8 @@ export function InterviewsView() {
                     onChange={(e) => setRescheduleForm({ ...rescheduleForm, startTime: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="label">End Time</label>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="label">End Time *</label>
                   <input
                     type="time"
                     className="input"
@@ -1066,7 +1069,7 @@ export function InterviewsView() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '0.75rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
                 <label className="label">Reason for Rescheduling</label>
                 <input
                   type="text"
@@ -1077,7 +1080,7 @@ export function InterviewsView() {
                 />
               </div>
 
-              <div style={{ marginBottom: '1.25rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
                 <label className="label">Meeting Link (optional update)</label>
                 <input
                   type="url"
@@ -1087,11 +1090,11 @@ export function InterviewsView() {
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setIsRescheduleOpen(false)}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-default)' }}>
+                <button type="button" className="button-secondary" onClick={() => setIsRescheduleOpen(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                <button type="submit" className="button-primary" disabled={submitting}>
                   {submitting ? 'Rescheduling...' : 'Confirm Reschedule'}
                 </button>
               </div>

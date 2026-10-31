@@ -98,32 +98,33 @@ export class AnalyticsService {
       activityWhere.organizationId = user.organizationId;
     }
 
-    // 1. Job status distribution counts (Batch 1: 4 count queries)
-    const [totalJobs, publishedJobs, draftJobs, closedJobs] = await Promise.all([
+    // Execute all independent aggregate and list queries concurrently in a single batch
+    const [
+      totalJobs,
+      publishedJobs,
+      draftJobs,
+      closedJobs,
+      totalCandidates,
+      totalApplications,
+      recentApplicationsCount,
+      stageGroups,
+      deadlineJobs,
+      recentActivityLogs,
+    ] = await Promise.all([
       prisma.job.count({ where: jobWhere }),
       prisma.job.count({ where: { ...jobWhere, status: JobStatus.PUBLISHED } }),
       user.role === UserRole.CLIENT ? Promise.resolve(0) : prisma.job.count({ where: { ...jobWhere, status: JobStatus.DRAFT } }),
       prisma.job.count({ where: { ...jobWhere, status: JobStatus.CLOSED } }),
-    ]);
-
-    // 2. Candidate & Application volume counts (Batch 2: 3 count/group queries)
-    const [totalCandidates, totalApplications, recentApplicationsCount] = await Promise.all([
       user.role === UserRole.CLIENT
         ? prisma.application.groupBy({ by: ['candidateId'], where: appWhere }).then((g) => g.length)
         : prisma.candidate.count({ where: candidateWhere }),
       prisma.application.count({ where: appWhere }),
       prisma.application.count({ where: { ...appWhere, appliedAt: { gte: sevenDaysAgo } } }),
-    ]);
-
-    // 3. Stage breakdown grouping (Batch 3)
-    const stageGroups = await prisma.application.groupBy({
-      by: ['stage'],
-      _count: { id: true },
-      where: appWhere,
-    });
-
-    // 4. Approaching deadlines and recent activity (Batch 4: 2 list queries with deterministic secondary sort & field selection)
-    const [deadlineJobs, recentActivityLogs] = await Promise.all([
+      prisma.application.groupBy({
+        by: ['stage'],
+        _count: { id: true },
+        where: appWhere,
+      }),
       prisma.job.findMany({
         where: {
           ...jobWhere,

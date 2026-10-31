@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
+import { resendVerificationEmail } from "../lib/api";
 import {
   Lock,
   Mail,
@@ -16,7 +17,39 @@ import {
   CheckCircle2,
   ArrowRight,
   KeyRound,
+  Database,
+  ExternalLink,
+  RefreshCw,
 } from "lucide-react";
+
+function isEmailNotConfirmedError(error: string | null): boolean {
+  if (!error) return false;
+  const lower = error.toLowerCase();
+  return lower.includes("email not confirmed") || lower.includes("not confirmed") || lower.includes("verify your email");
+}
+
+function isDatabaseConnectionError(error: string | null): boolean {
+  if (!error) return false;
+  const lower = error.toLowerCase();
+  return (
+    lower.includes("can't reach database server") ||
+    lower.includes("cant reach database server") ||
+    lower.includes("database server") ||
+    lower.includes("pooler.supabase.com") ||
+    lower.includes("tenant") ||
+    lower.includes("database is unreachable") ||
+    lower.includes("database_unavailable") ||
+    lower.includes("enotfound") ||
+    lower.includes("prisma") ||
+    lower.includes("p1001") ||
+    lower.includes("p1002") ||
+    lower.includes("p1008") ||
+    lower.includes("p1017") ||
+    lower.includes("timed out") ||
+    lower.includes("database server is running") ||
+    lower.includes("prismaclientinitializationerror")
+  );
+}
 
 interface AuthViewProps {
   initialMode?: "login" | "register";
@@ -65,6 +98,41 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
   // Feedback states
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [justVerified] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("verified") === "true";
+  });
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  const handleResendEmail = async (targetEmail?: string) => {
+    const emailToUse = targetEmail || unconfirmedEmail || email || forgotEmail;
+    if (!emailToUse || !emailToUse.includes("@")) {
+      setSubmitError("Please enter your email address to receive a verification link.");
+      return;
+    }
+    setResendingEmail(true);
+    setResendSuccess(null);
+    setSubmitError(null);
+    try {
+      const res = await resendVerificationEmail(emailToUse.trim());
+      setResendSuccess(res.message);
+      setUnconfirmedEmail(emailToUse.trim().toLowerCase());
+      setResendCooldown(30);
+    } catch (err: any) {
+      setSubmitError(err.message || "Failed to resend verification email");
+    } finally {
+      setResendingEmail(false);
+    }
+  };
 
   // Sync mode with route if user navigates
   useEffect(() => {
@@ -82,6 +150,8 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
+    setForgotMessage(null);
+    setResendSuccess(null);
 
     if (!email || !password) {
       setSubmitError("Email and password are required");
@@ -94,6 +164,9 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
 
     if (!res.success && res.error) {
       setSubmitError(res.error);
+      if (isEmailNotConfirmedError(res.error)) {
+        setUnconfirmedEmail(email.trim().toLowerCase());
+      }
     } else {
       navigate("/");
     }
@@ -138,9 +211,9 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
     if (res.requiresEmailVerification) {
       setMode("login");
       setSubmitError(null);
-      setForgotMessage(
-        "Registration successful! Please check your email inbox to verify your email address before signing in.",
-      );
+      setForgotMessage(null);
+      setUnconfirmedEmail(email.trim().toLowerCase());
+      setResendSuccess("Verification email dispatched! Please check your inbox and spam folder.");
     } else if (!res.success && res.error) {
       setSubmitError(res.error);
     } else {
@@ -415,63 +488,30 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
 
       {/* Mode Switcher Tabs (Only if not in forgot-password) */}
       {mode !== "forgot-password" && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            background: "rgba(0, 0, 0, 0.25)",
-            padding: "4px",
-            borderRadius: "var(--radius-md)",
-            marginBottom: "1.5rem",
-            border: "1px solid var(--border-subtle)",
-          }}
-        >
+        <div className="auth-mode-selector" role="tablist">
           <button
             type="button"
+            role="tab"
+            aria-selected={mode === "login"}
             onClick={() => {
               setMode("login");
               setSubmitError(null);
+              setResendSuccess(null);
             }}
-            style={{
-              padding: "0.65rem 1rem",
-              borderRadius: "6px",
-              border: "none",
-              background: mode === "login" ? "var(--primary)" : "transparent",
-              color: mode === "login" ? "#ffffff" : "var(--text-dim)",
-              fontWeight: 600,
-              fontSize: "0.9rem",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.4rem",
-              transition: "all 0.2s ease",
-            }}
+            className={`auth-mode-tab ${mode === "login" ? "active" : ""}`}
           >
             <LogIn size={15} /> Sign In
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={mode === "register"}
             onClick={() => {
               setMode("register");
               setSubmitError(null);
+              setResendSuccess(null);
             }}
-            style={{
-              padding: "0.65rem 1rem",
-              borderRadius: "6px",
-              border: "none",
-              background:
-                mode === "register" ? "var(--primary)" : "transparent",
-              color: mode === "register" ? "#ffffff" : "var(--text-dim)",
-              fontWeight: 600,
-              fontSize: "0.9rem",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.4rem",
-              transition: "all 0.2s ease",
-            }}
+            className={`auth-mode-tab ${mode === "register" ? "active" : ""}`}
           >
             <UserPlus size={15} /> Register Agency
           </button>
@@ -505,8 +545,112 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
         </div>
       )}
 
-      {/* Errors or Notices */}
-      {(submitError || profileError) && (
+      {/* Errors or Diagnostic Notices */}
+      {isDatabaseConnectionError(submitError || profileError) ? (
+        <div className="auth-db-status-banner" role="alert">
+          <div className="auth-db-status-header">
+            <Database size={20} className="auth-db-status-icon" aria-hidden="true" />
+            <div className="auth-db-status-content">
+              <strong>Database Connection Paused or Unreachable</strong>
+              <p>
+                The backend could not reach the cloud PostgreSQL database at Supabase.
+                Free-tier Supabase projects are automatically paused after a period of inactivity.
+              </p>
+              <div className="auth-db-status-actions">
+                <a
+                  href="https://supabase.com/dashboard/project/osrbdzeyqbresvineakk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="button-primary auth-db-btn"
+                >
+                  <ExternalLink size={14} aria-hidden="true" /> Resume in Supabase
+                </a>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="button-secondary auth-db-btn"
+                >
+                  <RefreshCw size={14} aria-hidden="true" /> Retry Connection
+                </button>
+              </div>
+              <details className="auth-db-details">
+                <summary>Technical error details</summary>
+                <code>{submitError || profileError}</code>
+              </details>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Verification Link Sent / Email Confirmation Required */}
+      {!isDatabaseConnectionError(submitError || profileError) &&
+      (isEmailNotConfirmedError(submitError) || unconfirmedEmail) ? (
+        <div className="auth-verification-banner" role="alert">
+          <div className="auth-verification-header">
+            <Mail size={20} className="auth-verification-icon" aria-hidden="true" />
+            <div className="auth-verification-content">
+              <strong>Email Verification Required</strong>
+              <p>
+                {unconfirmedEmail
+                  ? `A verification email has been sent to ${unconfirmedEmail}. Please check your inbox (and spam folder) and click the link to activate your workspace.`
+                  : "Your email address is not verified yet. Please check your email inbox to verify your email before signing in."}
+              </p>
+              <div className="auth-verification-actions">
+                <button
+                  type="button"
+                  onClick={() => handleResendEmail(unconfirmedEmail || email)}
+                  disabled={resendingEmail || resendCooldown > 0}
+                  className="button-primary auth-resend-btn"
+                >
+                  {resendingEmail ? (
+                    <>
+                      <RefreshCw size={13} className="spin-icon" /> Sending...
+                    </>
+                  ) : resendCooldown > 0 ? (
+                    `Resend available in ${resendCooldown}s`
+                  ) : (
+                    <>
+                      <Mail size={13} /> Resend verification email
+                    </>
+                  )}
+                </button>
+              </div>
+              {resendSuccess && (
+                <div className="auth-resend-feedback">
+                  <CheckCircle2 size={14} /> {resendSuccess}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Just Verified Success Banner */}
+      {justVerified && !submitError && !unconfirmedEmail && (
+        <div
+          style={{
+            padding: "0.85rem 1rem",
+            background: "rgba(16, 185, 129, 0.1)",
+            border: "1px solid rgba(16, 185, 129, 0.3)",
+            borderRadius: "var(--radius-md)",
+            marginBottom: "1.5rem",
+            fontSize: "0.85rem",
+            color: "var(--success)",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+          }}
+          role="status"
+        >
+          <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+          <span>Email verified successfully! You can now sign in to your workspace.</span>
+        </div>
+      )}
+
+      {/* General Error */}
+      {!isDatabaseConnectionError(submitError || profileError) &&
+      !isEmailNotConfirmedError(submitError) &&
+      (submitError || profileError) ? (
         <div
           style={{
             padding: "0.85rem 1rem",
@@ -520,13 +664,15 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
             alignItems: "center",
             gap: "0.5rem",
           }}
+          role="alert"
         >
           <AlertTriangle size={16} style={{ flexShrink: 0 }} />
           <span>{submitError || profileError}</span>
         </div>
-      )}
+      ) : null}
 
-      {forgotMessage && (
+      {/* Password reset instructions */}
+      {forgotMessage && !isEmailNotConfirmedError(submitError) && !unconfirmedEmail && (
         <div
           style={{
             padding: "0.85rem 1rem",
