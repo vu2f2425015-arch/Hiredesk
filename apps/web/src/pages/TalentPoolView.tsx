@@ -74,6 +74,7 @@ export function TalentPoolView() {
   const [folderNameInput, setFolderNameInput] = useState<string>('');
   const [folderDescInput, setFolderDescInput] = useState<string>('');
   const [folderActionError, setFolderActionError] = useState<string | null>(null);
+  const [isSubmittingFolder, setIsSubmittingFolder] = useState<boolean>(false);
 
   // Add candidate to folder modal
   const [candidateForFolder, setCandidateForFolder] = useState<TalentPoolCandidate | null>(null);
@@ -144,39 +145,60 @@ export function TalentPoolView() {
     }
   }, [token, isAuthorized, loadCandidates]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isCreateFolderOpen) setIsCreateFolderOpen(false);
+        if (isEditFolderOpen) setIsEditFolderOpen(false);
+        if (candidateForFolder) setCandidateForFolder(null);
+        if (candidateForJob) setCandidateForJob(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCreateFolderOpen, isEditFolderOpen, candidateForFolder, candidateForJob]);
+
   // Handlers for Folder operations
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !folderNameInput.trim()) return;
+    if (!token || !folderNameInput.trim() || isSubmittingFolder) return;
     setFolderActionError(null);
+    setIsSubmittingFolder(true);
     try {
-      await createTalentPoolFolder(token, {
+      const created = await createTalentPoolFolder(token, {
         name: folderNameInput.trim(),
         description: folderDescInput.trim() || undefined,
       });
+      setFolders((prev) => [...prev, created]);
       setFolderNameInput('');
       setFolderDescInput('');
       setIsCreateFolderOpen(false);
-      loadMetadata();
+      await loadMetadata();
     } catch (err: any) {
       setFolderActionError(err.message || 'Failed to create folder');
+    } finally {
+      setIsSubmittingFolder(false);
     }
   };
 
   const handleUpdateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !folderToEdit || !folderNameInput.trim()) return;
+    if (!token || !folderToEdit || !folderNameInput.trim() || isSubmittingFolder) return;
     setFolderActionError(null);
+    setIsSubmittingFolder(true);
     try {
-      await updateTalentPoolFolder(token, folderToEdit.id, {
+      const updated = await updateTalentPoolFolder(token, folderToEdit.id, {
         name: folderNameInput.trim(),
         description: folderDescInput.trim() || undefined,
       });
+      setFolders((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
       setFolderToEdit(null);
       setIsEditFolderOpen(false);
-      loadMetadata();
+      await loadMetadata();
     } catch (err: any) {
       setFolderActionError(err.message || 'Failed to update folder');
+    } finally {
+      setIsSubmittingFolder(false);
     }
   };
 
@@ -185,11 +207,12 @@ export function TalentPoolView() {
     if (!window.confirm(`Delete folder "${folderName}"? Candidates will not be deleted.`)) return;
     try {
       await deleteTalentPoolFolder(token, folderId);
+      setFolders((prev) => prev.filter((f) => f.id !== folderId));
       if (selectedFolderId === folderId) {
         setSelectedFolderId('');
       }
-      loadMetadata();
-      loadCandidates();
+      await loadMetadata();
+      await loadCandidates();
     } catch (err: any) {
       alert(`Error deleting folder: ${err.message}`);
     }
@@ -800,60 +823,93 @@ export function TalentPoolView() {
 
       {/* Create Folder Modal */}
       {isCreateFolderOpen && (
-        <div className="modal-backdrop">
-          <div className="modal-content" style={{ maxWidth: 450 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FolderPlus style={{ color: 'var(--primary)' }} /> Create Talent Folder
-              </h3>
-              <button className="btn-icon" onClick={() => setIsCreateFolderOpen(false)}>
-                <X size={18} />
+        <div
+          className="modal-backdrop"
+          onClick={() => !isSubmittingFolder && setIsCreateFolderOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-folder-title"
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-title-wrap">
+                <div className="modal-header-icon">
+                  <FolderPlus size={20} />
+                </div>
+                <div>
+                  <h3 id="create-folder-title">Create Talent Folder</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Organize candidates into reusable talent pools
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setIsCreateFolderOpen(false)}
+                aria-label="Close dialog"
+                disabled={isSubmittingFolder}
+              >
+                <X size={16} />
               </button>
             </div>
 
             {folderActionError && (
-              <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {folderActionError}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', marginBottom: '14px', fontSize: '12px' }}>
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>{folderActionError}</span>
               </div>
             )}
 
             <form onSubmit={handleCreateFolder}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
-                    Folder Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="input-field"
-                    placeholder="e.g. Senior Frontend, React Leads, Executive"
-                    value={folderNameInput}
-                    onChange={(e) => setFolderNameInput(e.target.value)}
-                  />
-                </div>
+              <div className="modal-form-group">
+                <label className="modal-label" htmlFor="create-folder-name">
+                  Folder Name <span className="required-star">*</span>
+                </label>
+                <input
+                  id="create-folder-name"
+                  type="text"
+                  required
+                  autoFocus
+                  className="modal-input"
+                  placeholder="e.g. Senior Frontend, React Leads, Executive"
+                  value={folderNameInput}
+                  onChange={(e) => setFolderNameInput(e.target.value)}
+                  disabled={isSubmittingFolder}
+                />
+              </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
-                    Description (optional)
-                  </label>
-                  <textarea
-                    className="input-field"
-                    rows={3}
-                    placeholder="Describe the candidate category or purpose of this folder..."
-                    value={folderDescInput}
-                    onChange={(e) => setFolderDescInput(e.target.value)}
-                  />
-                </div>
+              <div className="modal-form-group">
+                <label className="modal-label" htmlFor="create-folder-desc">
+                  Description <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <textarea
+                  id="create-folder-desc"
+                  className="modal-input"
+                  rows={3}
+                  placeholder="Describe the candidate category or purpose of this folder..."
+                  value={folderDescInput}
+                  onChange={(e) => setFolderDescInput(e.target.value)}
+                  disabled={isSubmittingFolder}
+                />
+              </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setIsCreateFolderOpen(false)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={!folderNameInput.trim()}>
-                    Create Folder
-                  </button>
-                </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => setIsCreateFolderOpen(false)}
+                  disabled={isSubmittingFolder}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button-primary"
+                  disabled={!folderNameInput.trim() || isSubmittingFolder}
+                >
+                  {isSubmittingFolder ? 'Creating Folder...' : 'Create Folder'}
+                </button>
               </div>
             </form>
           </div>
@@ -862,58 +918,91 @@ export function TalentPoolView() {
 
       {/* Edit Folder Modal */}
       {isEditFolderOpen && folderToEdit && (
-        <div className="modal-backdrop">
-          <div className="modal-content" style={{ maxWidth: 450 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Edit2 style={{ color: 'var(--primary)' }} /> Edit Folder
-              </h3>
-              <button className="btn-icon" onClick={() => setIsEditFolderOpen(false)}>
-                <X size={18} />
+        <div
+          className="modal-backdrop"
+          onClick={() => !isSubmittingFolder && setIsEditFolderOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-folder-title"
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-title-wrap">
+                <div className="modal-header-icon">
+                  <Edit2 size={20} />
+                </div>
+                <div>
+                  <h3 id="edit-folder-title">Edit Folder</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Update talent folder name and details
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setIsEditFolderOpen(false)}
+                aria-label="Close dialog"
+                disabled={isSubmittingFolder}
+              >
+                <X size={16} />
               </button>
             </div>
 
             {folderActionError && (
-              <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {folderActionError}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', marginBottom: '14px', fontSize: '12px' }}>
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>{folderActionError}</span>
               </div>
             )}
 
             <form onSubmit={handleUpdateFolder}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
-                    Folder Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    className="input-field"
-                    value={folderNameInput}
-                    onChange={(e) => setFolderNameInput(e.target.value)}
-                  />
-                </div>
+              <div className="modal-form-group">
+                <label className="modal-label" htmlFor="edit-folder-name">
+                  Folder Name <span className="required-star">*</span>
+                </label>
+                <input
+                  id="edit-folder-name"
+                  type="text"
+                  required
+                  autoFocus
+                  className="modal-input"
+                  value={folderNameInput}
+                  onChange={(e) => setFolderNameInput(e.target.value)}
+                  disabled={isSubmittingFolder}
+                />
+              </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
-                    Description
-                  </label>
-                  <textarea
-                    className="input-field"
-                    rows={3}
-                    value={folderDescInput}
-                    onChange={(e) => setFolderDescInput(e.target.value)}
-                  />
-                </div>
+              <div className="modal-form-group">
+                <label className="modal-label" htmlFor="edit-folder-desc">
+                  Description <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <textarea
+                  id="edit-folder-desc"
+                  className="modal-input"
+                  rows={3}
+                  value={folderDescInput}
+                  onChange={(e) => setFolderDescInput(e.target.value)}
+                  disabled={isSubmittingFolder}
+                />
+              </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setIsEditFolderOpen(false)}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={!folderNameInput.trim()}>
-                    Save Changes
-                  </button>
-                </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => setIsEditFolderOpen(false)}
+                  disabled={isSubmittingFolder}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button-primary"
+                  disabled={!folderNameInput.trim() || isSubmittingFolder}
+                >
+                  {isSubmittingFolder ? 'Saving Changes...' : 'Save Changes'}
+                </button>
               </div>
             </form>
           </div>
@@ -922,62 +1011,80 @@ export function TalentPoolView() {
 
       {/* Add Candidate to Folder Modal */}
       {candidateForFolder && (
-        <div className="modal-backdrop">
-          <div className="modal-content" style={{ maxWidth: 450 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FolderPlus style={{ color: 'var(--primary)' }} /> Add to Folder
-              </h3>
-              <button className="btn-icon" onClick={() => setCandidateForFolder(null)}>
-                <X size={18} />
+        <div
+          className="modal-backdrop"
+          onClick={() => setCandidateForFolder(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-candidate-folder-title"
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-title-wrap">
+                <div className="modal-header-icon">
+                  <FolderPlus size={20} />
+                </div>
+                <div>
+                  <h3 id="add-candidate-folder-title">Add to Folder</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Assign candidate to an agency talent folder
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setCandidateForFolder(null)}
+                aria-label="Close dialog"
+              >
+                <X size={16} />
               </button>
             </div>
 
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px' }}>
               Add <strong>{candidateForFolder.name}</strong> ({candidateForFolder.candidateCode}) to an agency folder:
             </p>
 
             {folders.length === 0 ? (
               <div>
-                <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                <p style={{ color: 'var(--text-tertiary)', fontSize: '13px' }}>
                   No folders created yet. Please create a folder first.
                 </p>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-                  <button className="btn btn-secondary" onClick={() => setCandidateForFolder(null)}>
+                <div className="modal-footer">
+                  <button type="button" className="button-secondary" onClick={() => setCandidateForFolder(null)}>
                     Close
                   </button>
                 </div>
               </div>
             ) : (
               <form onSubmit={handleAddCandidateToFolder}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
-                      Select Folder *
-                    </label>
-                    <select
-                      className="input-field"
-                      required
-                      value={targetFolderId}
-                      onChange={(e) => setTargetFolderId(e.target.value)}
-                    >
-                      <option value="">-- Choose a Folder --</option>
-                      {folders.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name} ({f.candidateCount} candidates)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="modal-form-group">
+                  <label className="modal-label" htmlFor="select-target-folder">
+                    Select Folder <span className="required-star">*</span>
+                  </label>
+                  <select
+                    id="select-target-folder"
+                    className="modal-input"
+                    required
+                    value={targetFolderId}
+                    onChange={(e) => setTargetFolderId(e.target.value)}
+                  >
+                    <option value="">-- Choose a Folder --</option>
+                    {folders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({f.candidateCount} candidates)
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    <button type="button" className="btn btn-secondary" onClick={() => setCandidateForFolder(null)}>
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn btn-primary" disabled={!targetFolderId}>
-                      Add to Folder
-                    </button>
-                  </div>
+                <div className="modal-footer">
+                  <button type="button" className="button-secondary" onClick={() => setCandidateForFolder(null)}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="button-primary" disabled={!targetFolderId}>
+                    Add to Folder
+                  </button>
                 </div>
               </form>
             )}
@@ -987,75 +1094,107 @@ export function TalentPoolView() {
 
       {/* Assign Candidate to Job Modal */}
       {candidateForJob && (
-        <div className="modal-backdrop">
-          <div className="modal-content" style={{ maxWidth: 500 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Briefcase style={{ color: 'var(--primary)' }} /> Assign to Open Job
-              </h3>
-              <button className="btn-icon" onClick={() => setCandidateForJob(null)}>
-                <X size={18} />
+        <div
+          className="modal-backdrop"
+          onClick={() => !submittingAssign && setCandidateForJob(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="assign-job-title"
+        >
+          <div className="modal-content" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-header-title-wrap">
+                <div className="modal-header-icon">
+                  <Briefcase size={20} />
+                </div>
+                <div>
+                  <h3 id="assign-job-title">Assign to Open Job</h3>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    Deploy candidate to an active vacancy pipeline
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setCandidateForJob(null)}
+                aria-label="Close dialog"
+                disabled={submittingAssign}
+              >
+                <X size={16} />
               </button>
             </div>
 
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 14px' }}>
               Create a new application for <strong>{candidateForJob.name}</strong> ({candidateForJob.candidateCode}) for a vacancy in your agency:
             </p>
 
             {assignSuccessMessage && (
-              <div style={{ padding: '0.75rem', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {assignSuccessMessage}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(16, 185, 129, 0.1)', color: 'var(--success)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '8px', marginBottom: '14px', fontSize: '12px' }}>
+                <span>{assignSuccessMessage}</span>
               </div>
             )}
 
             {assignError && (
-              <div style={{ padding: '0.75rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-                {assignError}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', marginBottom: '14px', fontSize: '12px' }}>
+                <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                <span>{assignError}</span>
               </div>
             )}
 
             <form onSubmit={handleAssignCandidateToJob}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
-                    Select Target Job *
-                  </label>
-                  <select
-                    className="input-field"
-                    required
-                    value={targetJobId}
-                    onChange={(e) => setTargetJobId(e.target.value)}
-                  >
-                    <option value="">-- Choose an active vacancy --</option>
-                    {jobs.map((job) => (
-                      <option key={job.id} value={job.id}>
-                        [{job.jobCode}] {job.title} - {job.client?.name || 'Client'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="modal-form-group">
+                <label className="modal-label" htmlFor="select-target-job">
+                  Select Target Job <span className="required-star">*</span>
+                </label>
+                <select
+                  id="select-target-job"
+                  className="modal-input"
+                  required
+                  value={targetJobId}
+                  onChange={(e) => setTargetJobId(e.target.value)}
+                  disabled={submittingAssign}
+                >
+                  <option value="">-- Choose an active vacancy --</option>
+                  {jobs.map((job) => (
+                    <option key={job.id} value={job.id}>
+                      [{job.jobCode}] {job.title} - {job.client?.name || 'Client'}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', fontWeight: 500 }}>
-                    Internal Recruiter Notes (optional)
-                  </label>
-                  <textarea
-                    className="input-field"
-                    rows={3}
-                    placeholder="Add rationale, matching criteria or recruiter context..."
-                    value={assignNotes}
-                    onChange={(e) => setAssignNotes(e.target.value)}
-                  />
-                </div>
+              <div className="modal-form-group">
+                <label className="modal-label" htmlFor="assign-job-notes">
+                  Internal Recruiter Notes <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <textarea
+                  id="assign-job-notes"
+                  className="modal-input"
+                  rows={3}
+                  placeholder="Add rationale, matching criteria or recruiter context..."
+                  value={assignNotes}
+                  onChange={(e) => setAssignNotes(e.target.value)}
+                  disabled={submittingAssign}
+                />
+              </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setCandidateForJob(null)} disabled={submittingAssign}>
-                    Cancel
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={!targetJobId || submittingAssign}>
-                    {submittingAssign ? 'Assigning...' : 'Assign Candidate'}
-                  </button>
-                </div>
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  className="button-secondary"
+                  onClick={() => setCandidateForJob(null)}
+                  disabled={submittingAssign}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="button-primary"
+                  disabled={!targetJobId || submittingAssign}
+                >
+                  {submittingAssign ? 'Assigning...' : 'Assign Candidate'}
+                </button>
               </div>
             </form>
           </div>
