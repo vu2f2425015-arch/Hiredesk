@@ -16,13 +16,16 @@ import {
   Activity,
   Check,
   Building2,
+  Share2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import { ApplicationStage } from '@hiredesk/shared';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
 import { DashboardMetrics, fetchDashboardAnalytics } from '../lib/api';
 import { EmptyState } from '../components/ui/EmptyState';
 import { StatCard } from '../components/ui/StatCard';
-import { PageHeader } from '../components/shell/PageHeader';
 
 const STAGES: Array<{ value: ApplicationStage; label: string; tone: string }> = [
   { value: ApplicationStage.APPLIED, label: 'Applied', tone: 'neutral' },
@@ -461,11 +464,29 @@ function DashboardSkeleton() {
 
 export function DashboardView() {
   const { session, profile } = useAuth();
+  const { showToast, success: toastSuccess } = useToast();
+  const [copiedLink, setCopiedLink] = useState(false);
   const token = session?.access_token;
   const cacheKey = profile?.organizationId ? `hd_dashboard_cache_${profile.organizationId}` : null;
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(() => readCachedMetrics(cacheKey));
   const [loading, setLoading] = useState(!metrics);
   const [error, setError] = useState<string | null>(null);
+
+  const orgSlug = (profile?.organizationName || 'agency')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+  const careerUrl = `${window.location.origin}/career/${orgSlug}`;
+
+  const handleCopyCareerLink = () => {
+    navigator.clipboard.writeText(careerUrl).then(() => {
+      setCopiedLink(true);
+      toastSuccess('Career Portal Link Copied!', `Share ${careerUrl} with candidates to receive applications.`);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }).catch(() => {
+      showToast('Career portal URL: ' + careerUrl, { type: 'info' });
+    });
+  };
 
   const loadMetrics = useCallback(async () => {
     if (!token) return;
@@ -502,17 +523,60 @@ export function DashboardView() {
 
   return (
     <div className="dashboard-page">
-      <PageHeader
-        title="Dashboard"
-        description={`Recruitment activity for ${profile.organizationName || 'your workspace'}.`}
-        action={<Link className="button-primary" to="/jobs"><BriefcaseBusiness size={16} /> Post job</Link>}
-        secondaryActions={(
-          <div className="dashboard-quick-actions">
-            <Link className="button-secondary" to="/unmatched"><Inbox size={15} /> Review inbound</Link>
-            <Link className="button-secondary" to="/interviews"><CalendarDays size={15} /> Schedule interview</Link>
+      {/* Branded Executive Hero Header */}
+      <section className="dashboard-hero-card" aria-label="Workspace overview">
+        <div className="dashboard-hero-content">
+          <div className="dashboard-hero-eyebrow">
+            <span className="hero-brand-badge">
+              <Sparkles size={12} className="hero-badge-sparkle" /> HiredeskHR ATS
+            </span>
+            <span className="hero-org-tag">
+              <Building2 size={12} /> {profile.organizationName || 'Agency Workspace'}
+            </span>
+            <span className="hero-status-pill">
+              <span className="pulse-dot" /> Live Pipeline
+            </span>
           </div>
-        )}
-      />
+
+          <h1 className="dashboard-hero-title">
+            HiredeskHR Dashboard
+          </h1>
+
+          <p className="dashboard-hero-sub">
+            Welcome back, <strong>{profile.fullName || profile.firstName || 'Recruiter'}</strong>. Manage agency vacancies, candidate pipelines, and automated inbound resume matching for <strong>{profile.organizationName || 'your recruitment agency'}</strong> on HiredeskHR.
+          </p>
+
+          <div className="dashboard-hero-actions">
+            <Link className="button-primary hero-btn-post" to="/jobs">
+              <BriefcaseBusiness size={15} /> Post Job Vacancy
+            </Link>
+            <Link className="button-secondary" to="/interviews?schedule=1">
+              <CalendarDays size={15} /> Schedule Interview
+            </Link>
+            <Link className="button-secondary" to="/unmatched">
+              <Inbox size={15} /> Review Inbound
+            </Link>
+            <button
+              type="button"
+              className="button-secondary hero-btn-share"
+              onClick={handleCopyCareerLink}
+              title="Copy public career portal URL for candidates"
+            >
+              {copiedLink ? <Check size={14} color="var(--success)" /> : <Share2 size={14} />}
+              {copiedLink ? 'Copied Link!' : 'Share Career Portal'}
+            </button>
+            <a
+              href={`/career/${orgSlug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="button-ghost hero-btn-preview"
+              title="Preview Public Career Page"
+            >
+              <ExternalLink size={14} />
+            </a>
+          </div>
+        </div>
+      </section>
 
       {error && metrics && (
         <div className="dashboard-inline-error" role="status">
@@ -537,8 +601,8 @@ export function DashboardView() {
       {metrics && (
         <>
           {metrics.totalJobs === 0 && metrics.totalCandidates === 0 && (
-            <section className="onboarding-panel" aria-labelledby="onboarding-title" style={{ padding: '1.5rem', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-sm)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+            <section className="onboarding-panel dashboard-roadmap" aria-labelledby="onboarding-title">
+              <div className="roadmap-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', background: 'var(--primary-subtle)', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.5rem' }}>
                     <Sparkles size={12} /> QUICK START ROADMAP
@@ -550,15 +614,15 @@ export function DashboardView() {
                   <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {((metrics.totalJobs > 0 ? 1 : 0) + (metrics.publishedJobs > 0 ? 1 : 0) + (metrics.totalApplications > 0 ? 1 : 0))} of 3 Completed ({Math.round((((metrics.totalJobs > 0 ? 1 : 0) + (metrics.publishedJobs > 0 ? 1 : 0) + (metrics.totalApplications > 0 ? 1 : 0)) / 3) * 100)}%)
                   </span>
-                  <div style={{ width: '140px', height: '6px', background: 'var(--border-default)', borderRadius: '999px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.round((((metrics.totalJobs > 0 ? 1 : 0) + (metrics.publishedJobs > 0 ? 1 : 0) + (metrics.totalApplications > 0 ? 1 : 0)) / 3) * 100)}%`, height: '100%', background: 'var(--primary)', borderRadius: '999px', transition: 'width 0.3s ease' }} />
+                  <div className="roadmap-progress-track" role="progressbar" aria-label="Workspace setup progress" aria-valuemin={0} aria-valuemax={3} aria-valuenow={(metrics.totalJobs > 0 ? 1 : 0) + (metrics.publishedJobs > 0 ? 1 : 0) + (metrics.totalApplications > 0 ? 1 : 0)}>
+                    <div className="roadmap-progress-value" style={{ width: `${Math.round((((metrics.totalJobs > 0 ? 1 : 0) + (metrics.publishedJobs > 0 ? 1 : 0) + (metrics.totalApplications > 0 ? 1 : 0)) / 3) * 100)}%` }} />
                   </div>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                 {/* Step 1 */}
-                <div style={{ padding: '1.25rem', borderRadius: 'var(--radius-lg)', background: metrics.totalJobs > 0 ? 'var(--bg-subtle)' : 'var(--bg-surface)', border: `1px solid ${metrics.totalJobs > 0 ? 'var(--border-default)' : 'var(--primary)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
+                <div className={`roadmap-step-card${metrics.totalJobs === 0 ? ' roadmap-step-current' : ' roadmap-step-complete'}`}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Step 1</span>
@@ -585,7 +649,7 @@ export function DashboardView() {
                 </div>
 
                 {/* Step 2 */}
-                <div style={{ padding: '1.25rem', borderRadius: 'var(--radius-lg)', background: metrics.publishedJobs > 0 ? 'var(--bg-subtle)' : 'var(--bg-surface)', border: `1px solid ${metrics.publishedJobs > 0 ? 'var(--border-default)' : 'var(--border-default)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
+                <div className={`roadmap-step-card${metrics.publishedJobs > 0 ? ' roadmap-step-complete' : metrics.totalJobs > 0 ? ' roadmap-step-current' : ''}`}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Step 2</span>
@@ -610,7 +674,7 @@ export function DashboardView() {
                 </div>
 
                 {/* Step 3 */}
-                <div style={{ padding: '1.25rem', borderRadius: 'var(--radius-lg)', background: metrics.totalApplications > 0 ? 'var(--bg-subtle)' : 'var(--bg-surface)', border: `1px solid ${metrics.totalApplications > 0 ? 'var(--border-default)' : 'var(--border-default)'}`, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
+                <div className={`roadmap-step-card${metrics.totalApplications > 0 ? ' roadmap-step-complete' : metrics.publishedJobs > 0 ? ' roadmap-step-current' : ''}`}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Step 3</span>
@@ -637,20 +701,89 @@ export function DashboardView() {
             </section>
           )}
 
-          <section className="dashboard-stats" aria-label="Recruitment summary">
-            <StatCard label="Active jobs" value={metrics.publishedJobs} description={`${metrics.totalJobs} total jobs`} to="/jobs" />
-            <StatCard label="Candidates" value={metrics.totalCandidates} description="Unique candidates across vacancies" />
+          {/* 4 Executive KPI Stat Cards */}
+          <section className="dashboard-stats" aria-label="Recruitment executive metrics">
+            <StatCard
+              label="Active Vacancies"
+              value={metrics.publishedJobs}
+              description={`${metrics.totalJobs} total jobs created`}
+              icon={<BriefcaseBusiness size={18} />}
+              tone="primary"
+              badge={metrics.publishedJobs > 0 ? `${metrics.publishedJobs} Published` : '0 Active'}
+              to="/jobs"
+            />
+            <StatCard
+              label="Talent Pool"
+              value={metrics.totalCandidates}
+              description="Unique candidates across vacancies"
+              icon={<Users size={18} />}
+              tone="violet"
+              badge={metrics.totalCandidates > 0 ? `${metrics.totalCandidates} Sourced` : '0 Candidates'}
+              to="/talent-pool"
+            />
+            <StatCard
+              label="Active Pipeline"
+              value={metrics.totalApplications}
+              description="Candidates across all stages"
+              icon={<FileText size={18} />}
+              tone="emerald"
+              badge={metrics.totalApplications > 0 ? `${metrics.totalApplications} In Review` : 'Ready'}
+              to="/jobs"
+            />
+            <StatCard
+              label="Recent Inbound"
+              value={metrics.recentApplicationsCount}
+              description="New applications in last 7 days"
+              icon={<Zap size={18} />}
+              tone="amber"
+              badge="Autonomous IMAP"
+              to="/unmatched"
+            />
           </section>
 
+          {/* Application Pipeline Funnel */}
           <section className="dashboard-panel pipeline-panel" aria-labelledby="pipeline-title">
             <div className="panel-heading">
               <div>
-                <h2 id="pipeline-title">Application pipeline</h2>
+                <h2 id="pipeline-title">Application Pipeline</h2>
                 <p>{metrics.totalApplications.toLocaleString()} applications across all stages</p>
               </div>
+              <Link className="panel-heading-link" to="/jobs">
+                Manage Vacancies <ArrowRight size={14} />
+              </Link>
             </div>
             {metrics.totalApplications === 0 ? (
-              <EmptyState title="No applications yet" description="Applications will appear here as candidates apply to your published jobs." />
+              <div className="pipeline-funnel-guide">
+                <div className="funnel-steps-track" aria-label="Recruitment Stages">
+                  {STAGES.slice(0, 6).map((stage, idx) => (
+                    <div key={stage.value} className="funnel-step-node">
+                      <div className="funnel-step-badge">
+                        <span className={`stage-tone-dot tone-${stage.tone}`} />
+                        <span className="funnel-step-num">0{idx + 1}</span>
+                      </div>
+                      <strong className="funnel-step-label">{stage.label}</strong>
+                      <span className="funnel-step-count">0 active</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pipeline-empty-guide-content">
+                  <div className="guide-icon-banner">
+                    <Activity size={20} className="guide-icon" />
+                  </div>
+                  <div className="guide-text">
+                    <h3>Your Automated Pipeline is Ready</h3>
+                    <p>
+                      When candidates apply via your public career page or email their resumes with atomic <code>JOB-XXXX</code> codes, HiredeskHR parses attachments and automatically advances candidates through your screening stages.
+                    </p>
+                  </div>
+                  <div className="guide-action">
+                    <Link to="/jobs" className="button-primary">
+                      <BriefcaseBusiness size={14} /> Post First Vacancy to Open Pipeline
+                    </Link>
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
                 <div
@@ -675,6 +808,56 @@ export function DashboardView() {
                 </ul>
               </>
             )}
+          </section>
+
+          {/* Agency Recruitment Toolkit */}
+          <section className="agency-toolkit-section" aria-label="Agency capabilities">
+            <div className="toolkit-grid">
+              <div className="toolkit-card">
+                <div className="toolkit-card-icon tone-primary">
+                  <Share2 size={18} />
+                </div>
+                <div className="toolkit-card-body">
+                  <h4>Public Career Portal</h4>
+                  <p>Distribute your agency's branded career board for public candidate submissions.</p>
+                  <div className="toolkit-card-action">
+                    <button type="button" className="inline-action-btn" onClick={handleCopyCareerLink}>
+                      <Copy size={13} /> Copy <code>/career/{orgSlug}</code>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="toolkit-card">
+                <div className="toolkit-card-icon tone-emerald">
+                  <MailCheck size={18} />
+                </div>
+                <div className="toolkit-card-body">
+                  <h4>Deterministic Matching</h4>
+                  <p>Inbound emails with <code>JOB-XXXX</code> in the subject route straight to the right vacancy.</p>
+                  <div className="toolkit-card-action">
+                    <Link to="/unmatched" className="inline-action-btn">
+                      <Inbox size={13} /> View Inbound Queue &rarr;
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="toolkit-card">
+                <div className="toolkit-card-icon tone-violet">
+                  <ShieldCheck size={18} />
+                </div>
+                <div className="toolkit-card-body">
+                  <h4>Client Review Portals</h4>
+                  <p>Share candidate shortlists with clients using strict role-scoped reviewer access.</p>
+                  <div className="toolkit-card-action">
+                    <Link to="/talent-pool" className="inline-action-btn">
+                      <Users size={13} /> Open Talent Pool &rarr;
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
           </section>
 
           <div className="dashboard-panels-grid">

@@ -11,7 +11,7 @@ function getCrumbs(pathname: string): Crumb[] {
   }
 
   const routes: Record<string, string> = {
-    '/': 'Dashboard',
+    '/': 'HiredeskHR Dashboard',
     '/jobs': 'Jobs',
     '/talent-pool': 'Talent pool',
     '/interviews': 'Interviews',

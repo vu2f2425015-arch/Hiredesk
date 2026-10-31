@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   Calendar as CalendarIcon,
@@ -30,15 +31,28 @@ import {
   fetchPendingInterviewRequests,
   fetchJobs,
   ApiJob,
+  ApplicationItem,
+  fetchJobApplications,
 } from '../lib/api';
 
 import { useDebounce } from '../hooks/useDebounce';
 
 export function InterviewsView() {
   const { session, profile } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const token = session?.access_token;
   const orgId = profile?.organizationId;
   const interviewsCacheKey = orgId ? `hd_interviews_cache_${orgId}` : null;
+  const lookupsCacheKey = orgId ? `hd_interview_lookups_${orgId}` : null;
+
+  const [cachedLookups] = useState(() => {
+    try {
+      const cached = lookupsCacheKey ? sessionStorage.getItem(lookupsCacheKey) : null;
+      return cached ? JSON.parse(cached) as { pendingRequests: ApiPendingInterviewRequest[]; interviewers: ApiInterviewerOption[]; jobs: ApiJob[] } : null;
+    } catch {
+      return null;
+    }
+  });
 
   const [interviews, setInterviews] = useState<ApiInterview[]>(() => {
     try {
@@ -49,9 +63,14 @@ export function InterviewsView() {
       return [];
     }
   });
-  const [pendingRequests, setPendingRequests] = useState<ApiPendingInterviewRequest[]>([]);
-  const [interviewers, setInterviewers] = useState<ApiInterviewerOption[]>([]);
-  const [jobs, setJobs] = useState<ApiJob[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<ApiPendingInterviewRequest[]>(() => cachedLookups?.pendingRequests || []);
+  const [interviewers, setInterviewers] = useState<ApiInterviewerOption[]>(() => cachedLookups?.interviewers || []);
+  const [jobs, setJobs] = useState<ApiJob[]>(() => cachedLookups?.jobs || []);
+  const [lookupsLoading, setLookupsLoading] = useState(!cachedLookups);
+  const [lookupsError, setLookupsError] = useState<string | null>(null);
+  const [applications, setApplications] = useState<ApplicationItem[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+  const [applicationsError, setApplicationsError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(interviews.length === 0);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,39 +132,117 @@ export function InterviewsView() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
+  const loadLookups = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
-    setError(null);
+    setLookupsLoading(true);
+    setLookupsError(null);
     try {
-      const [intRes, reqRes, interviewerRes, jobsRes] = await Promise.all([
-        fetchInterviews(token, {
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          search: debouncedSearch || undefined,
-        }),
+      const [reqRes, interviewerRes, jobsRes] = await Promise.all([
         fetchPendingInterviewRequests(token),
         fetchInterviewers(token),
         fetchJobs(token, { limit: 100 }),
       ]);
+      setPendingRequests(reqRes);
+      setInterviewers(interviewerRes);
+      setJobs(jobsRes.jobs);
+      if (lookupsCacheKey) {
+        try {
+          sessionStorage.setItem(lookupsCacheKey, JSON.stringify({ pendingRequests: reqRes, interviewers: interviewerRes, jobs: jobsRes.jobs }));
+        } catch {}
+      }
+    } catch (err: any) {
+      setLookupsError(err.message || 'Some interview scheduling options could not be loaded.');
+    } finally {
+      setLookupsLoading(false);
+    }
+  }, [token, lookupsCacheKey]);
+
+  const loadData = useCallback(async (showInitialLoading = false) => {
+    if (!token) return;
+    if (showInitialLoading) setLoading(true);
+    setError(null);
+    try {
+      const intRes = await fetchInterviews(token, {
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        search: debouncedSearch || undefined,
+      });
       setInterviews(intRes.interviews);
       if (interviewsCacheKey) {
         try {
           sessionStorage.setItem(interviewsCacheKey, JSON.stringify(intRes.interviews));
         } catch {}
       }
-      setPendingRequests(reqRes);
-      setInterviewers(interviewerRes);
-      setJobs(jobsRes.jobs);
     } catch (err: any) {
-      setError(err.message || 'Failed to load interviews data');
+      setError(err.message || 'Failed to load interviews');
     } finally {
       setLoading(false);
     }
-  }, [token, statusFilter, debouncedSearch]);
+  }, [token, statusFilter, debouncedSearch, interviewsCacheKey]);
 
   useEffect(() => {
-    loadData();
+    void loadData(true);
   }, [loadData]);
+
+  useEffect(() => {
+    void loadLookups();
+  }, [loadLookups]);
+
+  useEffect(() => {
+    if (searchParams.get('schedule') !== '1') return;
+    setScheduleForm((current) => ({
+      ...current,
+      jobId: current.jobId || jobs[0]?.id || '',
+      clientId: current.clientId || jobs[0]?.clientId || '',
+      interviewerUserProfileId: profile?.id || interviewers[0]?.id || '',
+    }));
+    setFormError(null);
+    setIsScheduleOpen(true);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('schedule');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams, jobs, interviewers, profile?.id]);
+
+  useEffect(() => {
+    if (!isScheduleOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !submitting) setIsScheduleOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [isScheduleOpen, submitting]);
+
+  useEffect(() => {
+    if (!isScheduleOpen || !token || !scheduleForm.jobId) {
+      setApplications([]);
+      setApplicationsLoading(false);
+      setApplicationsError(null);
+      return;
+    }
+    let active = true;
+    const cacheKey = orgId ? `hd_job_applications_${orgId}_${scheduleForm.jobId}` : null;
+    try {
+      const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
+      if (cached) setApplications(JSON.parse(cached) as ApplicationItem[]);
+      else setApplications([]);
+    } catch {
+      setApplications([]);
+    }
+    setApplicationsLoading(true);
+    setApplicationsError(null);
+    fetchJobApplications(token, scheduleForm.jobId)
+      .then((result) => {
+        if (!active) return;
+        setApplications(result.applications);
+        if (cacheKey) {
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(result.applications)); } catch {}
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) setApplicationsError(err instanceof Error ? err.message : 'Could not load candidates for this job.');
+      })
+      .finally(() => { if (active) setApplicationsLoading(false); });
+    return () => { active = false; };
+  }, [isScheduleOpen, token, orgId, scheduleForm.jobId]);
 
   const handleOpenScheduleForRequest = (req: ApiPendingInterviewRequest) => {
     setScheduleForm({
@@ -176,8 +273,9 @@ export function InterviewsView() {
     setFormError(null);
 
     try {
-      const startIso = new Date(`${scheduleForm.startDate}T${scheduleForm.startTime}:00`).toISOString();
-      const endIso = new Date(`${scheduleForm.startDate}T${scheduleForm.endTime}:00`).toISOString();
+      const start = new Date(`${scheduleForm.startDate}T${scheduleForm.startTime}:00`);
+      const end = new Date(`${scheduleForm.startDate}T${scheduleForm.endTime}:00`);
+      if (end.getTime() <= start.getTime()) throw new Error('End time must be later than start time.');
 
       await scheduleInterview(token, {
         applicationId: scheduleForm.applicationId,
@@ -187,8 +285,8 @@ export function InterviewsView() {
         interviewerUserProfileId: scheduleForm.interviewerUserProfileId,
         interviewRequestId: scheduleForm.interviewRequestId || null,
         type: scheduleForm.type,
-        startAt: startIso,
-        endAt: endIso,
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
         timeZone: scheduleForm.timeZone,
         meetingProvider: scheduleForm.meetingProvider || null,
         meetingUrl: scheduleForm.meetingUrl || null,
@@ -197,7 +295,7 @@ export function InterviewsView() {
       });
 
       setIsScheduleOpen(false);
-      await loadData();
+      await Promise.all([loadData(), loadLookups()]);
     } catch (err: any) {
       setFormError(err.message || 'Failed to schedule interview');
     } finally {
@@ -302,7 +400,7 @@ export function InterviewsView() {
   const cancelledCount = interviews.filter((i) => i.status === 'cancelled').length;
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
+    <div className="interviews-page" style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
         <div>
@@ -468,11 +566,19 @@ export function InterviewsView() {
             />
           </div>
 
-          <button className="btn btn-secondary" onClick={loadData} title="Refresh" style={{ height: '38px', padding: '0 0.75rem' }}>
+          <button className="btn btn-secondary" onClick={() => { void loadData(true); void loadLookups(); }} title="Refresh" style={{ height: '38px', padding: '0 0.75rem' }}>
             <RefreshCw size={15} className={loading ? 'pulse-dot' : ''} />
           </button>
         </div>
       </div>
+
+      {error && interviews.length > 0 && (
+        <div className="interviews-stale-notice" role="status">
+          <AlertTriangle size={15} aria-hidden="true" />
+          <span>Couldn’t refresh interviews. Showing previously loaded records.</span>
+          <button type="button" onClick={() => void loadData(true)}>Retry</button>
+        </div>
+      )}
 
       {loading && interviews.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -486,7 +592,7 @@ export function InterviewsView() {
             </div>
           ))}
         </div>
-      ) : error ? (
+      ) : error && interviews.length === 0 ? (
         <div className="card" style={{ padding: '2rem', textAlign: 'center', color: '#ef4444' }}>
           <AlertTriangle size={32} style={{ marginBottom: '0.5rem' }} />
           <div>{error}</div>
@@ -862,26 +968,91 @@ export function InterviewsView() {
 
       {/* Schedule Modal */}
       {isScheduleOpen && (
-        <div className="modal-backdrop" onClick={() => setIsScheduleOpen(false)}>
-          <div className="modal-content" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Schedule Interview</h2>
-              <button className="btn btn-secondary" style={{ padding: '0.3rem' }} onClick={() => setIsScheduleOpen(false)}>
+        <div className="modal-backdrop schedule-modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget && !submitting) setIsScheduleOpen(false); }}>
+          <section className="modal-content schedule-modal" role="dialog" aria-modal="true" aria-labelledby="schedule-interview-title" aria-describedby="schedule-interview-description" onClick={(e) => e.stopPropagation()}>
+            <header className="schedule-modal-header">
+              <div className="schedule-modal-title-wrap">
+                <span className="schedule-modal-icon" aria-hidden="true"><CalendarIcon size={18} /></span>
+                <div>
+                  <h2 id="schedule-interview-title">Schedule interview</h2>
+                  <p id="schedule-interview-description">Choose the candidate, interviewer and time for this conversation.</p>
+                </div>
+              </div>
+              <button type="button" className="schedule-modal-close" aria-label="Close schedule interview" disabled={submitting} onClick={() => setIsScheduleOpen(false)}>
                 <X size={18} />
               </button>
-            </div>
+            </header>
 
             {formError && (
-              <div style={{ padding: '0.6rem 0.8rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.85rem' }}>
+              <div className="schedule-form-error" role="alert">
                 {formError}
               </div>
             )}
 
-            <form onSubmit={handleScheduleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {lookupsError && (
+              <div className="schedule-form-error" role="status">
+                {lookupsError} Refresh the interview list and try again.
+              </div>
+            )}
+
+            <form className="schedule-modal-form" onSubmit={handleScheduleSubmit}>
+              <div className="schedule-modal-body">
+                <section className="schedule-form-section" aria-labelledby="schedule-candidate-heading">
+                  <div className="schedule-form-section-heading">
+                    <span className="schedule-form-step">01</span>
+                    <div><h3 id="schedule-candidate-heading">Candidate &amp; role</h3><p>Select the application this interview is for.</p></div>
+                  </div>
+                  <div className="schedule-form-grid">
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="label" htmlFor="schedule-job">Job opening <span aria-hidden="true">*</span></label>
+                      <select
+                        id="schedule-job"
+                        className="input"
+                        autoFocus
+                        required
+                        value={scheduleForm.jobId}
+                        onChange={(event) => {
+                          const job = jobs.find((item) => item.id === event.target.value);
+                          setScheduleForm({ ...scheduleForm, jobId: job?.id || '', clientId: job?.clientId || '', applicationId: '', candidateId: '' });
+                        }}
+                      >
+                        <option value="">{lookupsLoading ? 'Loading job openings…' : 'Choose a job opening'}</option>
+                        {jobs.map((job) => <option key={job.id} value={job.id}>{job.jobCode} · {job.title}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label className="label" htmlFor="schedule-application">Candidate application <span aria-hidden="true">*</span></label>
+                      <select
+                        id="schedule-application"
+                        className="input"
+                        required
+                        disabled={!scheduleForm.jobId || applicationsLoading || applications.length === 0}
+                        value={scheduleForm.applicationId}
+                        onChange={(event) => {
+                          const application = applications.find((item) => item.id === event.target.value);
+                          setScheduleForm({ ...scheduleForm, applicationId: application?.id || '', candidateId: application?.candidate.id || '' });
+                        }}
+                      >
+                        <option value="">
+                          {applicationsLoading ? 'Loading candidates…' : applicationsError ? 'Candidate list unavailable' : applications.length ? 'Choose a candidate' : 'No applications for this job'}
+                        </option>
+                        {applications.map((application) => <option key={application.id} value={application.id}>{application.candidate.name} · {application.candidate.candidateCode}</option>)}
+                      </select>
+                      {applicationsError && <span className="schedule-field-hint schedule-field-error">{applicationsError}</span>}
+                    </div>
+                  </div>
+                </section>
+
+                <section className="schedule-form-section" aria-labelledby="schedule-time-heading">
+                  <div className="schedule-form-section-heading">
+                    <span className="schedule-form-step">02</span>
+                    <div><h3 id="schedule-time-heading">Date &amp; time</h3><p>Interview time is sent using the selected time zone.</p></div>
+                  </div>
+                  <div className="schedule-form-grid">
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="label">Date *</label>
+                  <label className="label" htmlFor="schedule-date">Date <span aria-hidden="true">*</span></label>
                   <input
+                    id="schedule-date"
                     type="date"
                     className="input"
                     required
@@ -891,8 +1062,9 @@ export function InterviewsView() {
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="label">Time Zone *</label>
+                  <label className="label" htmlFor="schedule-time-zone">Time zone <span aria-hidden="true">*</span></label>
                   <input
+                    id="schedule-time-zone"
                     type="text"
                     className="input"
                     required
@@ -900,12 +1072,13 @@ export function InterviewsView() {
                     onChange={(e) => setScheduleForm({ ...scheduleForm, timeZone: e.target.value })}
                   />
                 </div>
-              </div>
+                  </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="schedule-form-grid">
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="label">Start Time *</label>
+                  <label className="label" htmlFor="schedule-start-time">Start time <span aria-hidden="true">*</span></label>
                   <input
+                    id="schedule-start-time"
                     type="time"
                     className="input"
                     required
@@ -915,8 +1088,9 @@ export function InterviewsView() {
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="label">End Time *</label>
+                  <label className="label" htmlFor="schedule-end-time">End time <span aria-hidden="true">*</span></label>
                   <input
+                    id="schedule-end-time"
                     type="time"
                     className="input"
                     required
@@ -924,17 +1098,25 @@ export function InterviewsView() {
                     onChange={(e) => setScheduleForm({ ...scheduleForm, endTime: e.target.value })}
                   />
                 </div>
-              </div>
+                  </div>
+                </section>
 
+                <section className="schedule-form-section" aria-labelledby="schedule-interviewer-heading">
+                  <div className="schedule-form-section-heading">
+                    <span className="schedule-form-step">03</span>
+                    <div><h3 id="schedule-interviewer-heading">Interviewer &amp; format</h3><p>Set who will meet the candidate and how.</p></div>
+                  </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="label">Assigned Interviewer *</label>
+                <label className="label" htmlFor="schedule-interviewer">Assigned interviewer <span aria-hidden="true">*</span></label>
                 <select
+                  id="schedule-interviewer"
                   className="input"
                   required
+                  disabled={lookupsLoading}
                   value={scheduleForm.interviewerUserProfileId}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, interviewerUserProfileId: e.target.value })}
                 >
-                  <option value="">Select Interviewer...</option>
+                  <option value="">{lookupsLoading ? 'Loading interviewers…' : 'Choose an interviewer'}</option>
                   {interviewers.map((i) => (
                     <option key={i.id} value={i.id}>
                       {i.fullName || `${i.firstName} ${i.lastName}`} ({i.role.replace('_', ' ')})
@@ -943,10 +1125,11 @@ export function InterviewsView() {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="schedule-form-grid">
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="label">Interview Format</label>
+                  <label className="label" htmlFor="schedule-format">Interview format</label>
                   <select
+                    id="schedule-format"
                     className="input"
                     value={scheduleForm.type}
                     onChange={(e) => setScheduleForm({ ...scheduleForm, type: e.target.value })}
@@ -960,8 +1143,9 @@ export function InterviewsView() {
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="label">Meeting Provider</label>
+                  <label className="label" htmlFor="schedule-provider">Meeting provider</label>
                   <select
+                    id="schedule-provider"
                     className="input"
                     value={scheduleForm.meetingProvider}
                     onChange={(e) => setScheduleForm({ ...scheduleForm, meetingProvider: e.target.value })}
@@ -974,12 +1158,20 @@ export function InterviewsView() {
                   </select>
                 </div>
               </div>
+                </section>
 
+                <section className="schedule-form-section" aria-labelledby="schedule-link-heading">
+                  <div className="schedule-form-section-heading">
+                    <span className="schedule-form-step">04</span>
+                    <div><h3 id="schedule-link-heading">Meeting details</h3><p>Paste a link created in your meeting provider. Automatic calendar creation isn’t connected yet.</p></div>
+                  </div>
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="label">Meeting URL</label>
+                <label className="label" htmlFor="schedule-meeting-url">Meeting URL</label>
                 <input
+                  id="schedule-meeting-url"
                   type="url"
                   className="input"
+                  required={scheduleForm.type === 'video' && ['google_meet', 'zoom', 'teams'].includes(scheduleForm.meetingProvider)}
                   placeholder="https://meet.google.com/xyz-abc-def"
                   value={scheduleForm.meetingUrl}
                   onChange={(e) => setScheduleForm({ ...scheduleForm, meetingUrl: e.target.value })}
@@ -987,8 +1179,9 @@ export function InterviewsView() {
               </div>
 
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="label">Internal Recruiter Notes (Confidential)</label>
+                <label className="label" htmlFor="schedule-internal-notes">Internal recruiter notes <span className="schedule-field-hint-inline">Private to your team</span></label>
                 <textarea
+                  id="schedule-internal-notes"
                   className="input"
                   rows={3}
                   placeholder="Private notes for the hiring team (never visible to candidate or client)..."
@@ -996,18 +1189,20 @@ export function InterviewsView() {
                   onChange={(e) => setScheduleForm({ ...scheduleForm, interviewerNotes: e.target.value })}
                   style={{ resize: 'vertical' }}
                 />
+                </div>
+                </section>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-default)' }}>
-                <button type="button" className="button-secondary" onClick={() => setIsScheduleOpen(false)}>
+              <footer className="schedule-modal-footer">
+                <button type="button" className="button-secondary" disabled={submitting} onClick={() => setIsScheduleOpen(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="button-primary" disabled={submitting}>
-                  {submitting ? 'Scheduling...' : 'Schedule & Dispatch Email'}
+                <button type="submit" className="button-primary" disabled={submitting || applicationsLoading || !scheduleForm.applicationId || !scheduleForm.interviewerUserProfileId}>
+                  {submitting ? 'Scheduling…' : <><CalendarIcon size={15} /> Schedule interview</>}
                 </button>
-              </div>
+              </footer>
             </form>
-          </div>
+          </section>
         </div>
       )}
 
