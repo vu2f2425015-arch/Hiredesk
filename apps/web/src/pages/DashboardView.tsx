@@ -472,7 +472,7 @@ export function DashboardView() {
   const [loading, setLoading] = useState(!metrics);
   const [error, setError] = useState<string | null>(null);
 
-  const orgSlug = (profile?.organizationName || 'agency')
+  const orgSlug = profile?.organizationSlug || (profile?.organizationName || 'agency')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');

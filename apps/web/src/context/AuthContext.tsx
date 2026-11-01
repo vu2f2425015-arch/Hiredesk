@@ -20,6 +20,7 @@ export interface TrustedUserProfile {
   role: UserRole;
   organizationId: string | null;
   organizationName: string | null;
+  organizationSlug?: string | null;
   clientId: string | null;
   clientName: string | null;
   isActive: boolean;

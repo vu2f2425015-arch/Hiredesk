@@ -15,6 +15,8 @@ import {
   X,
   Download,
   User,
+  ExternalLink,
+  Globe,
 } from 'lucide-react';
 import {
   ApiJob,
@@ -41,6 +43,11 @@ export function JobsView() {
 
   const orgId = profile?.organizationId;
   const jobsCacheKey = orgId ? `hd_jobs_cache_${orgId}` : null;
+  const orgSlug = profile?.organizationSlug || (profile?.organizationName || 'agency')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'agency';
+
 
   const [jobs, setJobs] = useState<ApiJob[]>(() => {
     try {
@@ -401,6 +408,18 @@ export function JobsView() {
                   >
                     <Layers size={13} style={{ marginRight: '0.25rem' }} /> Pipeline
                   </button>
+                  {job.status === 'published' && (
+                    <a
+                      href={`/career/${orgSlug}/${job.jobCode}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-secondary"
+                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}
+                      title="Open candidate application page in new tab"
+                    >
+                      <ExternalLink size={13} /> Apply Page
+                    </a>
+                  )}
                   <button className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={() => setSelectedJob(job)}>
                     Details
                   </button>
@@ -869,7 +888,13 @@ function JobDetailModal({
   onCloseJob?: () => void;
   onOpenCandidateProfile?: (candidateId: string) => void;
 }) {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
+  const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const orgSlug = profile?.organizationSlug || (profile?.organizationName || 'agency')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '') || 'agency';
+  const publicJobUrl = `${window.location.origin}/career/${orgSlug}/${job.jobCode}`;
   const token = session?.access_token;
   const [activeTab, setActiveTab] = useState<'details' | 'pipeline' | 'applicants'>('details');
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
@@ -988,6 +1013,52 @@ function JobDetailModal({
           </div>
         ) : activeTab === 'details' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+            {job.status === 'published' && (
+              <div style={{
+                padding: '0.9rem 1.15rem',
+                background: 'rgba(99, 102, 241, 0.08)',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '1rem',
+                flexWrap: 'wrap'
+              }}>
+                <div>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Globe size={13} /> Candidate Application Link
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', fontFamily: 'monospace', marginTop: '0.25rem', wordBreak: 'break-all' }}>
+                    {publicJobUrl}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(publicJobUrl);
+                      setCopiedLink(true);
+                      setTimeout(() => setCopiedLink(false), 2000);
+                    }}
+                  >
+                    {copiedLink ? <Check size={13} style={{ color: 'var(--success)' }} /> : <Copy size={13} />}
+                    {copiedLink ? 'Copied!' : 'Copy Link'}
+                  </button>
+                  <a
+                    href={publicJobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-primary"
+                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', textDecoration: 'none' }}
+                  >
+                    <ExternalLink size={13} /> View as Candidate
+                  </a>
+                </div>
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)' }}>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>Client Company</span>

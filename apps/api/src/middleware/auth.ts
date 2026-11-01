@@ -15,6 +15,7 @@ export interface AuthenticatedUser {
   role: UserRole;
   organizationId: string | null;
   organizationName: string | null;
+  organizationSlug: string | null;
   clientId: string | null;
   clientName: string | null;
   isActive: boolean;
@@ -96,6 +97,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     let organizationId = profile.organizationId;
     let organizationName = profile.organization ? profile.organization.name : null;
+    let organizationSlug = profile.organization ? profile.organization.slug : null;
 
     // If Super Admin has no assigned organization, auto-bind to the primary organization
     if (!organizationId && profile.role === UserRole.SUPER_ADMIN && prisma.organization?.findFirst) {
@@ -103,6 +105,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       if (defaultOrg) {
         organizationId = defaultOrg.id;
         organizationName = defaultOrg.name;
+        organizationSlug = defaultOrg.slug;
       }
     }
 
@@ -116,6 +119,7 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       role: profile.role as UserRole,
       organizationId,
       organizationName,
+      organizationSlug,
       clientId: profile.clientId,
       clientName: profile.client ? profile.client.name : null,
       isActive: profile.isActive,
