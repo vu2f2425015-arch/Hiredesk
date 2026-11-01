@@ -920,7 +920,27 @@ function JobDetailModal({
     setDownloadingId(applicationId);
     try {
       const { signedUrl } = await fetchResumeDownloadUrl(token, applicationId);
-      window.open(signedUrl, '_blank', 'noopener,noreferrer');
+      try {
+        const response = await fetch(signedUrl);
+        if (!response.ok) throw new Error('File fetch failed');
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `resume_${applicationId.slice(0, 8)}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      } catch (blobErr) {
+        const fallback = document.createElement('a');
+        fallback.href = signedUrl;
+        fallback.target = '_blank';
+        fallback.rel = 'noopener noreferrer';
+        document.body.appendChild(fallback);
+        fallback.click();
+        document.body.removeChild(fallback);
+      }
     } catch (err: any) {
       alert(`Download failed: ${err.message}`);
     } finally {

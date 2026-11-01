@@ -126,8 +126,29 @@ export function CandidateProfileModal({
     if (!token) return;
     setDownloadingResumeId(appId);
     try {
-      const { signedUrl } = await fetchResumeDownloadUrl(token, appId);
-      window.open(signedUrl, '_blank', 'noopener,noreferrer');
+      const { signedUrl, filename } = await fetchResumeDownloadUrl(token, appId);
+      try {
+        const res = await fetch(signedUrl);
+        if (!res.ok) throw new Error('Download request failed');
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename || 'resume.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(blobUrl);
+        document.body.removeChild(a);
+      } catch {
+        const a = document.createElement('a');
+        a.href = signedUrl;
+        a.download = filename || 'resume.pdf';
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     } catch (err: any) {
       alert(`Resume download failed: ${err.message}`);
     } finally {
@@ -192,7 +213,6 @@ export function CandidateProfileModal({
       }}
     >
       <div
-        className="glass-card"
         style={{
           maxWidth: '920px',
           width: '100%',
@@ -201,6 +221,10 @@ export function CandidateProfileModal({
           flexDirection: 'column',
           padding: 0,
           overflow: 'hidden',
+          background: 'var(--bg-surface)',
+          borderRadius: 'var(--radius-xl)',
+          border: '1px solid var(--border-subtle)',
+          boxShadow: 'var(--shadow-xl)',
         }}
       >
         {/* Modal Header */}
@@ -211,7 +235,7 @@ export function CandidateProfileModal({
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            background: 'rgba(255, 255, 255, 0.02)',
+            background: 'var(--bg-surface)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -460,7 +484,7 @@ export function CandidateProfileModal({
                   <div
                     style={{
                       padding: '1rem',
-                      background: 'rgba(0, 0, 0, 0.25)',
+                      background: 'var(--bg-canvas)',
                       borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--border-subtle)',
                     }}
@@ -483,12 +507,13 @@ export function CandidateProfileModal({
                         value={selectedTargetStage}
                         onChange={(e) => setSelectedTargetStage(e.target.value)}
                         style={{
-                          background: 'var(--bg-input)',
-                          border: '1px solid var(--border-subtle)',
+                          background: 'var(--bg-surface)',
+                          border: '1px solid var(--border-default)',
                           borderRadius: 'var(--radius-md)',
                           color: 'var(--text-main)',
-                          padding: '0.45rem 0.75rem',
+                          padding: '0.5rem 0.75rem',
                           fontSize: '0.85rem',
+                          fontWeight: 500,
                         }}
                       >
                         <option value={ApplicationStage.APPLIED}>Applied</option>
@@ -511,11 +536,11 @@ export function CandidateProfileModal({
                         style={{
                           flex: 1,
                           minWidth: '200px',
-                          background: 'var(--bg-input)',
-                          border: '1px solid var(--border-subtle)',
+                          background: 'var(--bg-surface)',
+                          border: '1px solid var(--border-default)',
                           borderRadius: 'var(--radius-md)',
                           color: 'var(--text-main)',
-                          padding: '0.45rem 0.75rem',
+                          padding: '0.5rem 0.75rem',
                           fontSize: '0.85rem',
                         }}
                       />
@@ -551,14 +576,21 @@ export function CandidateProfileModal({
                           {aiEvaluation && (
                             <span
                               style={{
-                                fontSize: '0.7rem',
-                                padding: '0.15rem 0.5rem',
+                                fontSize: '0.72rem',
+                                padding: '0.2rem 0.6rem',
                                 borderRadius: '4px',
-                                background: aiEvaluation.provider === 'google_gemini' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-                                color: aiEvaluation.provider === 'google_gemini' ? '#c084fc' : 'var(--text-muted)',
+                                background: 'rgba(99, 102, 241, 0.15)',
+                                color: 'var(--primary)',
+                                fontWeight: 700,
+                                border: '1px solid rgba(99, 102, 241, 0.3)',
+                                letterSpacing: '0.02em',
                               }}
                             >
-                              {aiEvaluation.provider === 'google_gemini' ? 'Google Gemini' : 'Deterministic Baseline'}
+                              {aiEvaluation.provider === 'google_gemini'
+                                ? 'Google Gemini'
+                                : aiEvaluation.provider === 'openai'
+                                ? 'OpenAI GPT-4o'
+                                : 'Hiredesk AI Engine'}
                             </span>
                           )}
                         </div>
@@ -609,7 +641,7 @@ export function CandidateProfileModal({
                               alignItems: 'center',
                               justifyContent: 'space-between',
                               padding: '0.75rem 1rem',
-                              background: 'rgba(0, 0, 0, 0.2)',
+                              background: 'var(--bg-canvas)',
                               borderRadius: '8px',
                               border: '1px solid var(--border-subtle)',
                               flexWrap: 'wrap',
@@ -809,7 +841,8 @@ export function CandidateProfileModal({
             borderTop: '1px solid var(--border-subtle)',
             display: 'flex',
             justifyContent: 'flex-end',
-            background: 'rgba(255, 255, 255, 0.02)',
+            background: 'var(--bg-surface)',
+            zIndex: 10,
           }}
         >
           <button className="btn btn-secondary" onClick={onClose}>

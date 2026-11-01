@@ -9,7 +9,7 @@ export type AiRecruiterMatchRequestInput = z.infer<typeof AiRecruiterMatchReques
 
 export interface AiRecruiterStatusDto {
   providerConfigured: boolean;
-  providerName: 'deterministic_baseline' | 'google_gemini' | 'anthropic_claude' | 'openai';
+  providerName: 'deterministic_baseline' | 'google_gemini' | 'anthropic_claude' | 'openai' | 'hiredesk_ai';
   model: string | null;
   capabilities: string[];
   message: string;
@@ -21,7 +21,7 @@ export interface AiRecruiterMatchEvaluationDto {
   applicationId: string;
   jobId: string;
   candidateId: string;
-  provider: 'deterministic_baseline' | 'google_gemini' | 'anthropic_claude' | 'openai';
+  provider: 'deterministic_baseline' | 'google_gemini' | 'anthropic_claude' | 'openai' | 'hiredesk_ai';
   model: string | null;
   promptVersion: string;
   evaluatedAt: string;
