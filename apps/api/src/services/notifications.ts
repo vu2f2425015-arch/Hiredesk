@@ -8,6 +8,25 @@ import {
 import { AuthenticatedUser } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
 
+interface CachedUnreadCount {
+  count: number;
+  expiresAt: number;
+}
+
+const unreadCountCache = new Map<string, CachedUnreadCount>();
+
+export function invalidateUnreadCountCache(userId?: string): void {
+  if (!userId) {
+    unreadCountCache.clear();
+    return;
+  }
+  for (const key of unreadCountCache.keys()) {
+    if (key.endsWith(`:${userId}`)) {
+      unreadCountCache.delete(key);
+    }
+  }
+}
+
 export class NotificationService {
   /**
    * Creates a notification with automatic idempotency / deduplication if eventKey is provided.
@@ -90,6 +109,8 @@ export class NotificationService {
       },
       'Notification created successfully'
     );
+
+    invalidateUnreadCountCache(input.userId);
 
     return {
       id: notification.id,
@@ -182,12 +203,23 @@ export class NotificationService {
   static async getUnreadCount(user: AuthenticatedUser): Promise<{ unreadCount: number }> {
     if (!user.organizationId) return { unreadCount: 0 };
 
+    const cacheKey = `${user.organizationId}:${user.id}`;
+    const cached = unreadCountCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return { unreadCount: cached.count };
+    }
+
     const count = await prisma.notification.count({
       where: {
         organizationId: user.organizationId,
         userId: user.id,
         isRead: false,
       },
+    });
+
+    unreadCountCache.set(cacheKey, {
+      count,
+      expiresAt: Date.now() + 15 * 1000,
     });
 
     return { unreadCount: count };
@@ -242,6 +274,8 @@ export class NotificationService {
       },
     });
 
+    invalidateUnreadCountCache(user.id);
+
     return {
       id: updated.id,
       type: updated.type,
@@ -278,6 +312,8 @@ export class NotificationService {
         readAt: new Date(),
       },
     });
+
+    invalidateUnreadCountCache(user.id);
 
     return { updatedCount: result.count };
   }

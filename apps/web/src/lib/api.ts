@@ -1319,7 +1319,8 @@ export interface TalentPoolQuery {
 
 export async function fetchTalentPoolCandidates(
   token: string,
-  query?: TalentPoolQuery
+  query?: TalentPoolQuery,
+  signal?: AbortSignal
 ): Promise<{
   candidates: TalentPoolCandidate[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
@@ -1344,6 +1345,7 @@ export async function fetchTalentPoolCandidates(
 
   const res = await apiFetch(`/api/talent-pool/candidates?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal,
   });
   const json = await res.json();
   if (!res.ok || !json.success) {

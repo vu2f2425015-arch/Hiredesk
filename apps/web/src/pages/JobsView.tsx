@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -34,7 +34,6 @@ import {
 import { EmploymentType, JobStatus, WorkplaceModel, UserRole } from '@hiredesk/shared';
 import { JobPipelineView } from './JobPipelineView';
 import { CandidateProfileModal } from './CandidateProfileModal';
-import { useDebounce } from '../hooks/useDebounce';
 
 export function JobsView() {
   const { session, profile } = useAuth();
@@ -56,7 +55,6 @@ export function JobsView() {
   const [loading, setLoading] = useState<boolean>(Boolean(token) && jobs.length === 0);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState<string>('');
-  const debouncedSearch = useDebounce(search, 250);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<ApiJob | null>(null);
   const [pipelineJob, setPipelineJob] = useState<ApiJob | null>(null);
@@ -67,15 +65,29 @@ export function JobsView() {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
 
-  const loadJobs = useCallback(async () => {
+  const displayedJobs = useMemo(() => {
+    return jobs.filter((job) => {
+      if (statusFilter && job.status !== statusFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase().trim();
+        const matchTitle = job.title?.toLowerCase().includes(q);
+        const matchCode = job.jobCode?.toLowerCase().includes(q);
+        const matchDept = job.department?.toLowerCase().includes(q);
+        const matchSkills = job.skills?.some((s) => s.toLowerCase().includes(q));
+        if (!matchTitle && !matchCode && !matchDept && !matchSkills) return false;
+      }
+      return true;
+    });
+  }, [jobs, statusFilter, search]);
+
+  const loadJobs = useCallback(async (isManual = false) => {
     if (!token) return;
-    setLoading(true);
+    if (isManual || jobs.length === 0) {
+      setLoading(true);
+    }
     setError(null);
     try {
-      const res = await fetchJobs(token, {
-        search: debouncedSearch || undefined,
-        status: (statusFilter as JobStatus) || undefined,
-      });
+      const res = await fetchJobs(token, { limit: 100 });
       setJobs(res.jobs);
       if (jobsCacheKey) {
         try {
@@ -87,7 +99,7 @@ export function JobsView() {
     } finally {
       setLoading(false);
     }
-  }, [token, debouncedSearch, statusFilter, jobsCacheKey]);
+  }, [token, jobsCacheKey, jobs.length]);
 
   useEffect(() => {
     if (token) {
@@ -249,7 +261,7 @@ export function JobsView() {
             <option value="closed">Closed</option>
           </select>
 
-          <button className="btn btn-secondary" onClick={loadJobs} title="Refresh jobs" style={{ height: '38px', padding: '0 0.75rem' }}>
+          <button className="btn btn-secondary" onClick={() => void loadJobs(true)} title="Refresh jobs" style={{ height: '38px', padding: '0 0.75rem' }}>
             <RefreshCw size={14} className={loading ? 'pulse-dot' : ''} />
           </button>
         </div>
@@ -276,30 +288,36 @@ export function JobsView() {
         <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--danger)' }}>
           <AlertCircle size={32} style={{ margin: '0 auto 0.5rem auto' }} />
           <p>{error}</p>
-          <button className="btn btn-secondary" style={{ marginTop: '1rem' }} onClick={loadJobs}>
+          <button className="btn btn-secondary" style={{ marginTop: '1rem' }} onClick={() => void loadJobs(true)}>
             Retry
           </button>
         </div>
-      ) : jobs.length === 0 ? (
+      ) : displayedJobs.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon-wrap">
             <Briefcase size={26} />
           </div>
-          <h2 className="empty-title">No Job Openings Found</h2>
+          <h2 className="empty-title">
+            {jobs.length === 0 ? 'No Job Openings Found' : 'No Matching Jobs Found'}
+          </h2>
           <p className="empty-desc">
-            {search || statusFilter
-              ? 'No jobs match your current search or filter criteria.'
-              : 'Your agency has not created any job vacancies yet. Click "Create Job" to generate your first vacancy with an atomic Job Code.'}
+            {jobs.length === 0
+              ? 'Your agency has not created any job vacancies yet. Click "Create Job" to generate your first vacancy with an atomic Job Code.'
+              : 'No job openings match your current search or filter criteria. Try adjusting your filters or resetting them.'}
           </p>
-          {canCreate && (
+          {jobs.length > 0 ? (
+            <button className="btn btn-secondary" onClick={() => { setSearch(''); setStatusFilter(''); }} style={{ margin: '0 auto' }}>
+              Reset Filters
+            </button>
+          ) : canCreate ? (
             <button className="button-primary" onClick={() => setIsCreateOpen(true)} style={{ margin: '0 auto' }}>
               <Plus size={16} /> Create Job Opening
             </button>
-          )}
+          ) : null}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
-          {jobs.map((job) => (
+          {displayedJobs.map((job: ApiJob) => (
             <div key={job.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>

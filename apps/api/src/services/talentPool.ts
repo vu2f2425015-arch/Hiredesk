@@ -13,7 +13,31 @@ import {
 import { AuthenticatedUser } from '../middleware/auth.js';
 import { logger } from '../utils/logger.js';
 
+interface CachedTalentPoolEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+
+const talentPoolCache = new Map<string, CachedTalentPoolEntry<any>>();
+const TALENT_POOL_CACHE_TTL_MS = 30 * 1000; // 30 seconds TTL
+
+export function invalidateTalentPoolCache(organizationId?: string): void {
+  if (!organizationId) {
+    talentPoolCache.clear();
+    return;
+  }
+  for (const key of talentPoolCache.keys()) {
+    if (key.includes(organizationId)) {
+      talentPoolCache.delete(key);
+    }
+  }
+}
+
 export class TalentPoolService {
+  static invalidateCache(organizationId?: string): void {
+    invalidateTalentPoolCache(organizationId);
+  }
+
   /**
    * Validates that the caller has recruiter/manager authorization
    * and non-null organization context. Client users are strictly denied.
@@ -45,6 +69,12 @@ export class TalentPoolService {
     query: TalentPoolQueryInput
   ): Promise<TalentPoolListResponse> {
     const organizationId = this.validateRecruiterScope(user);
+
+    const cacheKey = `tp:candidates:${organizationId}:${JSON.stringify(query)}`;
+    const cached = talentPoolCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
 
     const where: any = {
       organizationId,
@@ -238,7 +268,7 @@ export class TalentPoolService {
       };
     });
 
-    return {
+    const response: TalentPoolListResponse = {
       candidates: mappedCandidates,
       pagination: {
         page,
@@ -247,6 +277,20 @@ export class TalentPoolService {
         totalPages: Math.ceil(total / limit) || 1,
       },
     };
+
+    talentPoolCache.set(cacheKey, {
+      data: response,
+      expiresAt: Date.now() + TALENT_POOL_CACHE_TTL_MS,
+    });
+
+    if (talentPoolCache.size > 200) {
+      const now = Date.now();
+      for (const [k, v] of talentPoolCache.entries()) {
+        if (v.expiresAt <= now) talentPoolCache.delete(k);
+      }
+    }
+
+    return response;
   }
 
   /**
@@ -486,6 +530,8 @@ export class TalentPoolService {
       'Successfully associated candidate from talent pool with new job'
     );
 
+    invalidateTalentPoolCache(organizationId);
+
     return {
       application: result,
       isExisting: false,
@@ -504,6 +550,12 @@ export class TalentPoolService {
   static async listFolders(user: AuthenticatedUser): Promise<TalentPoolFolderDto[]> {
     const organizationId = this.validateRecruiterScope(user);
 
+    const cacheKey = `tp:folders:${organizationId}`;
+    const cached = talentPoolCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     const folders = await prisma.talentPoolFolder.findMany({
       where: { organizationId },
       orderBy: { name: 'asc' },
@@ -514,7 +566,7 @@ export class TalentPoolService {
       },
     });
 
-    return folders.map((f) => ({
+    const folderDtos = folders.map((f) => ({
       id: f.id,
       name: f.name,
       description: f.description,
@@ -522,6 +574,13 @@ export class TalentPoolService {
       createdAt: f.createdAt.toISOString(),
       updatedAt: f.updatedAt.toISOString(),
     }));
+
+    talentPoolCache.set(cacheKey, {
+      data: folderDtos,
+      expiresAt: Date.now() + 60 * 1000,
+    });
+
+    return folderDtos;
   }
 
   /**
@@ -558,6 +617,8 @@ export class TalentPoolService {
         description: input.description || null,
       },
     });
+
+    invalidateTalentPoolCache(organizationId);
 
     return {
       id: folder.id,
@@ -623,6 +684,8 @@ export class TalentPoolService {
       },
     });
 
+    invalidateTalentPoolCache(organizationId);
+
     return {
       id: updated.id,
       name: updated.name,
@@ -654,6 +717,8 @@ export class TalentPoolService {
     await prisma.talentPoolFolder.delete({
       where: { id: folderId },
     });
+
+    invalidateTalentPoolCache(organizationId);
 
     return { success: true };
   }
@@ -708,6 +773,8 @@ export class TalentPoolService {
       update: {},
     });
 
+    invalidateTalentPoolCache(organizationId);
+
     return {
       success: true,
       message: `Candidate ${candidate.name} added to folder "${folder.name}"`,
@@ -744,6 +811,8 @@ export class TalentPoolService {
         candidateId,
       },
     });
+
+    invalidateTalentPoolCache(organizationId);
 
     return {
       success: true,

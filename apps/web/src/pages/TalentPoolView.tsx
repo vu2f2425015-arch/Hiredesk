@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users,
   Search,
@@ -51,8 +51,10 @@ export function TalentPoolView() {
   const [totalCandidates, setTotalCandidates] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [isFiltering, setIsFiltering] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Filters state
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -106,8 +108,20 @@ export function TalentPoolView() {
   // Load Candidates
   const loadCandidates = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    if (candidates.length === 0) {
+      setInitialLoading(true);
+    } else {
+      setIsFiltering(true);
+    }
     setError(null);
+
     try {
       const query: TalentPoolQuery = {
         page: currentPage,
@@ -122,16 +136,18 @@ export function TalentPoolView() {
       if (selectedFolderId) query.folderId = selectedFolderId;
       if (debouncedLocation.trim()) query.location = debouncedLocation.trim();
 
-      const result = await fetchTalentPoolCandidates(token, query);
+      const result = await fetchTalentPoolCandidates(token, query, controller.signal);
       setCandidates(result.candidates);
       setTotalCandidates(result.pagination.total);
       setTotalPages(result.pagination.totalPages);
     } catch (err: any) {
+      if (err.name === 'AbortError') return;
       setError(err.message || 'Failed to load candidates from talent pool');
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setIsFiltering(false);
     }
-  }, [token, currentPage, debouncedSearch, debouncedSkills, selectedStage, selectedFolderId, debouncedLocation, sortBy, sortOrder]);
+  }, [token, currentPage, debouncedSearch, debouncedSkills, selectedStage, selectedFolderId, debouncedLocation, sortBy, sortOrder, candidates.length]);
 
   useEffect(() => {
     if (token && isAuthorized) {
@@ -515,6 +531,11 @@ export function TalentPoolView() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            {isFiltering && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}>
+                <RefreshCw size={12} className="spin" /> Updating...
+              </span>
+            )}
             {(searchTerm || skillsTerm || selectedStage || selectedFolderId || locationTerm) && (
               <button
                 className="btn btn-secondary"
@@ -531,7 +552,7 @@ export function TalentPoolView() {
               onClick={loadCandidates}
               title="Refresh candidate list"
             >
-              <RefreshCw size={13} className={loading ? 'spin' : ''} /> Refresh
+              <RefreshCw size={13} className={isFiltering ? 'spin' : ''} /> Refresh
             </button>
           </div>
         </div>
@@ -560,7 +581,7 @@ export function TalentPoolView() {
       )}
 
       {/* Candidates List / Table */}
-      {loading && candidates.length === 0 ? (
+      {initialLoading && candidates.length === 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {[1, 2, 3].map((i) => (
             <div key={i} className="glass-card" style={{ padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -588,7 +609,7 @@ export function TalentPoolView() {
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', opacity: isFiltering ? 0.65 : 1, transition: 'opacity 0.15s ease' }}>
           {candidates.map((candidate) => (
             <div
               key={candidate.id}

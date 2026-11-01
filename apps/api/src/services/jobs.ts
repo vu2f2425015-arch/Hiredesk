@@ -9,6 +9,27 @@ import {
 } from '@hiredesk/shared';
 import { AuthenticatedUser } from '../middleware/auth.js';
 import { invalidateMetricsCache } from './analytics.js';
+import { invalidateTalentPoolCache } from './talentPool.js';
+
+interface CachedJobsList {
+  data: { jobs: JobWithMeta[]; total: number; page: number; limit: number };
+  expiresAt: number;
+}
+
+const jobsCache = new Map<string, CachedJobsList>();
+const JOBS_CACHE_TTL_MS = 30 * 1000; // 30 seconds
+
+export function invalidateJobsCache(organizationId?: string): void {
+  if (!organizationId) {
+    jobsCache.clear();
+    return;
+  }
+  for (const key of jobsCache.keys()) {
+    if (key.includes(organizationId)) {
+      jobsCache.delete(key);
+    }
+  }
+}
 
 export interface JobWithMeta {
   id: string;
@@ -115,14 +136,26 @@ export class JobService {
     });
 
     invalidateMetricsCache(organizationId);
+    invalidateJobsCache(organizationId);
+    invalidateTalentPoolCache(organizationId);
 
     return JobService.mapJobToMeta(created);
+  }
+
+  static invalidateCache(organizationId?: string): void {
+    invalidateJobsCache(organizationId);
   }
 
   /**
    * Lists jobs with strict tenant and client scoping.
    */
   static async listJobs(user: AuthenticatedUser, query: JobQueryInput): Promise<{ jobs: JobWithMeta[]; total: number; page: number; limit: number }> {
+    const cacheKey = `jobs:${user.role}:${user.organizationId || 'super'}:${user.clientId || 'none'}:${JSON.stringify(query)}`;
+    const cached = jobsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.data;
+    }
+
     const where: any = {};
 
     // 1. Tenant boundary
@@ -175,12 +208,26 @@ export class JobService {
       }),
     ]);
 
-    return {
+    const result = {
       jobs: items.map(JobService.mapJobToMeta),
       total,
       page,
       limit,
     };
+
+    jobsCache.set(cacheKey, {
+      data: result,
+      expiresAt: Date.now() + JOBS_CACHE_TTL_MS,
+    });
+
+    if (jobsCache.size > 200) {
+      const now = Date.now();
+      for (const [k, v] of jobsCache.entries()) {
+        if (v.expiresAt <= now) jobsCache.delete(k);
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -291,6 +338,8 @@ export class JobService {
     });
 
     invalidateMetricsCache(updated.organizationId);
+    invalidateJobsCache(updated.organizationId);
+    invalidateTalentPoolCache(updated.organizationId);
 
     return JobService.mapJobToMeta(updated);
   }
@@ -333,6 +382,8 @@ export class JobService {
     });
 
     invalidateMetricsCache(updated.organizationId);
+    invalidateJobsCache(updated.organizationId);
+    invalidateTalentPoolCache(updated.organizationId);
 
     return JobService.mapJobToMeta(updated);
   }
@@ -386,6 +437,8 @@ export class JobService {
     });
 
     invalidateMetricsCache(duplicated.organizationId);
+    invalidateJobsCache(duplicated.organizationId);
+    invalidateTalentPoolCache(duplicated.organizationId);
 
     return JobService.mapJobToMeta(duplicated);
   }

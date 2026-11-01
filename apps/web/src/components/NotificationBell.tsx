@@ -43,7 +43,11 @@ export function NotificationBell() {
     };
 
     loadUnreadCount();
-    const interval = setInterval(loadUnreadCount, 20000);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void loadUnreadCount();
+      }
+    }, 45000);
     return () => clearInterval(interval);
   }, [token]);
 

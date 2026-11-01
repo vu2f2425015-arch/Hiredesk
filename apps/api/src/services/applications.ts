@@ -13,6 +13,8 @@ import { AuthenticatedUser } from '../middleware/auth.js';
 import { StorageService, validateUploadedFile } from './storage.js';
 import { NotificationService } from './notifications.js';
 import { invalidateMetricsCache } from './analytics.js';
+import { invalidateTalentPoolCache } from './talentPool.js';
+import { invalidateJobsCache } from './jobs.js';
 import { logger } from '../utils/logger.js';
 
 export interface PublicApplyResult {
@@ -243,6 +245,8 @@ export class ApplicationService {
       }, { timeout: 35000, maxWait: 15000 });
 
       invalidateMetricsCache(organization.id);
+      invalidateTalentPoolCache(organization.id);
+      invalidateJobsCache(organization.id);
 
       return {
         applicationId: result.id,
@@ -583,6 +587,8 @@ export class ApplicationService {
     }, { timeout: 35000, maxWait: 15000 });
 
     invalidateMetricsCache(app.organizationId);
+    invalidateTalentPoolCache(app.organizationId);
+    invalidateJobsCache(app.organizationId);
 
     return ApplicationService.getApplicationById(user, updated.id);
   }
