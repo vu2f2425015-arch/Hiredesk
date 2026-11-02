@@ -8,7 +8,7 @@ import React, {
 import { User, Session } from "@supabase/supabase-js";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { UserRole } from "@hiredesk/shared";
-import { registerUser } from "../lib/api";
+import { registerUser, apiFetch } from "../lib/api";
 
 export interface TrustedUserProfile {
   id: string;
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = useCallback(async (token: string) => {
     try {
       setProfileError(null);
-      const res = await fetch("/api/me", {
+      const res = await apiFetch("/api/me", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -87,6 +87,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(json.data.user);
         setPermissions(json.data.permissions);
       } else {
+        // If 401 unauthorized, token is expired or invalid - silently clear profile without alarming login screen
+        if (res.status === 401) {
+          setProfile(null);
+          setPermissions(null);
+          setProfileError(null);
+          return;
+        }
         const errorMsg = json.error?.message || "Failed to load user profile";
         setProfileError(errorMsg);
         setProfile(null);

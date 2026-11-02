@@ -15,6 +15,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useToast } from './Toast';
+import { apiFetch } from '../lib/api';
 
 interface CommandItem {
   id: string;
@@ -42,7 +43,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
       setTimeout(() => inputRef.current?.focus(), 50);
 
       // Fetch live jobs for quick jumping
-      fetch('/api/jobs?limit=10')
+      apiFetch('/api/jobs?limit=10')
         .then((res) => (res.ok ? res.json() : null))
         .then((json) => {
           if (json?.success && json?.data?.jobs) {
@@ -69,7 +70,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'nav-jobs',
       title: 'Vacancies & Jobs',
-      subtitle: 'Manage agency jobs, atomic job codes & pipelines',
+      subtitle: 'Manage agency jobs, job codes & application pipelines',
       category: 'Navigation',
       icon: <Briefcase size={16} color="var(--primary)" />,
       badge: 'Vacancies',
@@ -81,7 +82,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'nav-interviews',
       title: 'Interviews & Schedules',
-      subtitle: 'Calendar events, RFC 5545 .ics generator & conflict detection',
+      subtitle: 'Schedule interviews, sync calendar events & prevent double-booking',
       category: 'Navigation',
       icon: <Calendar size={16} color="var(--accent-violet)" />,
       badge: 'Calendar',
@@ -93,7 +94,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'nav-talent-pool',
       title: 'Talent Pool Folders',
-      subtitle: 'Reusable candidate repository across all organization vacancies',
+      subtitle: 'Browse and organize candidate profiles across all positions',
       category: 'Navigation',
       icon: <Users size={16} color="var(--accent-cyan)" />,
       action: () => {
@@ -104,7 +105,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'nav-reports',
       title: 'Analytics & Attribution',
-      subtitle: 'Conversion funnel & candidate source distribution',
+      subtitle: 'Track hiring funnels, source attribution & conversion rates',
       category: 'Navigation',
       icon: <TrendingUp size={16} color="var(--success)" />,
       action: () => {
@@ -115,7 +116,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'nav-unmatched',
       title: 'Unmatched Application Queue',
-      subtitle: 'Triage parsed incoming emails missing valid job codes',
+      subtitle: 'Review inbound resumes that need job assignment',
       category: 'Navigation',
       icon: <Inbox size={16} color="var(--warning)" />,
       badge: 'Inbound',
@@ -127,7 +128,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'nav-system-status',
       title: 'System Diagnostics & Health',
-      subtitle: 'Real-time database, worker & API status latency ping',
+      subtitle: 'Live API latency, database connection & system diagnostics',
       category: 'Navigation',
       icon: <Activity size={16} color="var(--success)" />,
       action: () => {
@@ -138,7 +139,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'nav-client-portal',
       title: 'Client Review Portal',
-      subtitle: 'Isolated client interface with redacted internal recruiter notes',
+      subtitle: 'Review candidates shared with clients and review feedback',
       category: 'Navigation',
       icon: <ShieldCheck size={16} color="var(--accent-cyan)" />,
       badge: 'Client',
@@ -150,7 +151,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'action-new-job',
       title: 'Create New Vacancy',
-      subtitle: 'Allocate next atomic Job Code (JOB-XXXX)',
+      subtitle: 'Create a new job opening and configure pipeline stages',
       category: 'Actions',
       icon: <PlusCircle size={16} color="var(--primary)" />,
       action: () => {
@@ -161,7 +162,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     {
       id: 'action-copy-api',
       title: 'Copy Health Endpoint URL',
-      subtitle: 'Copies http://localhost:4000/health to clipboard',
+      subtitle: 'Copy system health status URL to clipboard',
       category: 'Actions',
       icon: <Activity size={16} color="var(--primary)" />,
       action: () => {

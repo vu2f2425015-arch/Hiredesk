@@ -2,12 +2,71 @@ import { CreateJobInput, UpdateJobInput, JobQueryInput, PublicJobDto, RegisterUs
 import { API_BASE } from './config';
 
 /**
- * Fetch wrapper that prepends the API base URL.
- * In development: API_BASE is empty, so paths stay relative (handled by Vite proxy).
- * In production: API_BASE is the Render backend origin (e.g., https://hiredesk-api.onrender.com).
+ * Safely parse JSON from a fetch Response, handling empty bodies, HTML error pages,
+ * server cold-starts, and network errors gracefully without crashing callers.
  */
-function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${API_BASE}${input}`, init);
+export async function safeParseJson<T = any>(
+  res: Response,
+  fallbackMessage = 'Request failed'
+): Promise<{ success: boolean; data?: T; error?: { code?: string; message: string; details?: unknown }; meta?: any }> {
+  let text = '';
+  try {
+    text = await res.text();
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to read response body';
+    return {
+      success: false,
+      error: { code: 'NETWORK_ERROR', message: msg },
+    };
+  }
+
+  if (!text || !text.trim()) {
+    return {
+      success: false,
+      error: {
+        code: res.ok ? 'EMPTY_RESPONSE' : `HTTP_${res.status}`,
+        message: res.status >= 500
+          ? 'The server is temporarily unavailable or restarting. Please try again in a few moments.'
+          : res.status === 401
+            ? 'Your session has expired or is invalid. Please sign in again.'
+            : res.status === 403
+              ? 'You do not have permission to perform this action.'
+              : `${fallbackMessage} (${res.status} ${res.statusText || 'Error'})`,
+      },
+    };
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      success: false,
+      error: {
+        code: `HTTP_${res.status}`,
+        message: res.status >= 500
+          ? 'The server is temporarily unavailable or booting up. Please try again shortly.'
+          : `${fallbackMessage} (${res.status} ${res.statusText || 'Error'})`,
+      },
+    };
+  }
+}
+
+/**
+ * Fetch wrapper that prepends the API base URL and defensively wraps .json()
+ * so that any unexpected HTML, empty response, or proxy error never throws
+ * "Unexpected end of JSON input" anywhere in the application.
+ */
+export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const url = `${API_BASE}${input}`;
+  const res = await fetch(url, init);
+
+  // Wrap res.json() to prevent SyntaxError on empty / HTML responses
+  res.json = async function <T = any>(): Promise<T> {
+    const parsed = await safeParseJson<T>(res);
+    return parsed as unknown as T;
+  };
+
+  return res;
 }
 
 export interface ApiJob {

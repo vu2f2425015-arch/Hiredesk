@@ -163,7 +163,10 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
     setSubmitting(false);
 
     if (!res.success && res.error) {
-      setSubmitError(res.error);
+      const msg = res.error.toLowerCase().includes("invalid login credentials")
+        ? "Invalid email address or password. Please verify your credentials or use the demo login."
+        : res.error;
+      setSubmitError(msg);
       if (isEmailNotConfirmedError(res.error)) {
         setUnconfirmedEmail(email.trim().toLowerCase());
       }
@@ -725,7 +728,7 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); if (submitError) setSubmitError(null); }}
                 placeholder="recruiter@agency.com"
                 required
                 style={{
@@ -787,7 +790,7 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); if (submitError) setSubmitError(null); }}
                 placeholder="••••••••••••"
                 required
                 style={{
@@ -820,6 +823,48 @@ export function AuthView({ initialMode = "login" }: AuthViewProps) {
                 {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
             </div>
+          </div>
+
+          {/* Quick Demo Credentials Assistant */}
+          <div
+            style={{
+              padding: "0.6rem 0.85rem",
+              background: "var(--bg-hover)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "var(--radius-md)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: "0.8rem",
+              color: "var(--text-secondary)",
+              gap: "0.5rem",
+              marginTop: "0.25rem",
+              marginBottom: "0.25rem",
+            }}
+          >
+            <span>
+              <strong>Demo Recruiter:</strong> recruiter@agency.com
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("recruiter@agency.com");
+                setPassword("Password123!");
+                if (submitError) setSubmitError(null);
+              }}
+              style={{
+                background: "var(--accent-subtle)",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: "var(--radius-sm)",
+                padding: "0.25rem 0.6rem",
+                color: "var(--accent)",
+                fontWeight: 600,
+                fontSize: "0.75rem",
+                cursor: "pointer",
+              }}
+            >
+              Fill Demo Credentials
+            </button>
           </div>
 
           <button
