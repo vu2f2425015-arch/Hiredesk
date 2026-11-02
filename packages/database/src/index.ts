@@ -9,13 +9,13 @@ const rawDbUrl = process.env.DATABASE_URL;
 let configuredDbUrl = rawDbUrl;
 if (configuredDbUrl) {
   if (!configuredDbUrl.includes('connection_limit=')) {
-    configuredDbUrl = configuredDbUrl.includes('?') ? `${configuredDbUrl}&connection_limit=5` : `${configuredDbUrl}?connection_limit=5`;
+    configuredDbUrl = configuredDbUrl.includes('?') ? `${configuredDbUrl}&connection_limit=20` : `${configuredDbUrl}?connection_limit=20`;
   }
   if (!configuredDbUrl.includes('connect_timeout=')) {
-    configuredDbUrl = `${configuredDbUrl}&connect_timeout=15`;
+    configuredDbUrl = `${configuredDbUrl}&connect_timeout=30`;
   }
   if (!configuredDbUrl.includes('pool_timeout=')) {
-    configuredDbUrl = `${configuredDbUrl}&pool_timeout=15`;
+    configuredDbUrl = `${configuredDbUrl}&pool_timeout=30`;
   }
 }
 
