@@ -10,7 +10,6 @@ import {
   Activity,
   Layers,
   ArrowRight,
-  Sparkles,
   X,
   PlusCircle,
   ShieldCheck,
@@ -164,7 +163,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
       title: 'Copy Health Endpoint URL',
       subtitle: 'Copies http://localhost:4000/health to clipboard',
       category: 'Actions',
-      icon: <Sparkles size={16} color="var(--warning)" />,
+      icon: <Activity size={16} color="var(--primary)" />,
       action: () => {
         navigator.clipboard.writeText('http://localhost:4000/health');
         success('Copied API health URL to clipboard!');

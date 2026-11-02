@@ -8,7 +8,7 @@ import {
   MessageSquare,
   ArrowRightCircle,
   ExternalLink,
-  Sparkles,
+  Info,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -128,7 +128,7 @@ export function NotificationBell() {
       case 'stage_transition':
         return <ArrowRightCircle size={16} color="#ec4899" />;
       default:
-        return <Sparkles size={16} color="#6366f1" />;
+        return <Info size={16} color="var(--primary)" />;
     }
   };
 

@@ -6,7 +6,6 @@ import {
   CalendarDays,
   Inbox,
   RefreshCw,
-  Sparkles,
   ShieldCheck,
   Zap,
   Users,
@@ -85,18 +84,18 @@ function PublicHome() {
       <section className="hero-section">
         <div className="hero-badge">
           <span className="hero-badge-dot" aria-hidden="true" />
-          <Sparkles size={14} className="hero-badge-icon" aria-hidden="true" />
-          <span>Enterprise-Grade Agency ATS & Workflow Automation</span>
+          <ShieldCheck size={14} className="hero-badge-icon" aria-hidden="true" />
+          <span>Agency Recruitment System</span>
         </div>
 
         <h1 className="hero-title">
-          The High-Performance ATS Built for{' '}
-          <span className="hero-gradient-text">Modern Recruitment Agencies</span>
+          The Modern Applicant Tracking System Built for{' '}
+          <span className="hero-gradient-text">Recruitment Agencies</span>
         </h1>
 
         <p className="hero-description">
-          Streamline job distribution, automate inbound resume matching with deterministic job codes,
-          and deliver transparent, role-scoped client reviews — all in one unified workspace.
+          Publish vacancies, match candidate resumes to roles, track interview pipelines,
+          and collaborate on client feedback — all in one centralized workspace.
         </p>
 
         <div className="hero-actions">
@@ -523,15 +522,12 @@ export function DashboardView() {
 
   return (
     <div className="dashboard-page">
-      {/* Branded Executive Hero Header */}
+      {/* Executive Command Header */}
       <section className="dashboard-hero-card" aria-label="Workspace overview">
         <div className="dashboard-hero-content">
           <div className="dashboard-hero-eyebrow">
-            <span className="hero-brand-badge">
-              <Sparkles size={12} className="hero-badge-sparkle" /> HiredeskHR ATS
-            </span>
             <span className="hero-org-tag">
-              <Building2 size={12} /> {profile.organizationName || 'Agency Workspace'}
+              <Building2 size={13} /> {profile.organizationName || 'Agency Workspace'}
             </span>
             <span className="hero-status-pill">
               <span className="pulse-dot" /> Live Pipeline
@@ -539,11 +535,11 @@ export function DashboardView() {
           </div>
 
           <h1 className="dashboard-hero-title">
-            HiredeskHR Dashboard
+            Recruitment Overview
           </h1>
 
           <p className="dashboard-hero-sub">
-            Welcome back, <strong>{profile.fullName || profile.firstName || 'Recruiter'}</strong>. Manage agency vacancies, candidate pipelines, and automated inbound resume matching for <strong>{profile.organizationName || 'your recruitment agency'}</strong> on HiredeskHR.
+            Welcome back, <strong>{profile.fullName || profile.firstName || 'Recruiter'}</strong>. Manage vacancies, candidate pipelines, and client submissions for <strong>{profile.organizationName || 'your agency'}</strong>.
           </p>
 
           <div className="dashboard-hero-actions">
@@ -605,10 +601,10 @@ export function DashboardView() {
               <div className="roadmap-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
                 <div>
                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', background: 'var(--primary-subtle)', color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, marginBottom: '0.5rem' }}>
-                    <Sparkles size={12} /> QUICK START ROADMAP
+                    Workspace Setup
                   </div>
-                  <h2 id="onboarding-title" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Set up your recruitment workspace</h2>
-                  <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Follow these essential steps to configure your pipeline and start receiving candidates.</p>
+                  <h2 id="onboarding-title" style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Get Started with Your Workspace</h2>
+                  <p style={{ margin: '0.25rem 0 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Follow these key steps to configure your hiring pipeline and begin accepting applicants.</p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.35rem' }}>
                   <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -638,7 +634,7 @@ export function DashboardView() {
                     </div>
                     <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 0.35rem 0', color: 'var(--text-primary)' }}>Create a Job Opening</h3>
                     <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                      Define role requirements, skills, and compensation to allocate an atomic JOB-XXXX code.
+                      Specify job title, required skills, experience level, and compensation.
                     </p>
                   </div>
                   <div>
@@ -663,7 +659,7 @@ export function DashboardView() {
                     </div>
                     <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 0.35rem 0', color: 'var(--text-primary)' }}>Publish an Opening</h3>
                     <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                      Set status to Published so candidates can view and apply to your vacancies online.
+                      Set status to Published so candidates can browse and apply on your career portal.
                     </p>
                   </div>
                   <div>
@@ -688,7 +684,7 @@ export function DashboardView() {
                     </div>
                     <h3 style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 0.35rem 0', color: 'var(--text-primary)' }}>Receive Inbound Applications</h3>
                     <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-                      Applications from your career page or email are matched automatically to vacancies.
+                      Review incoming resumes, evaluate candidate fit, and advance applicants through stages.
                     </p>
                   </div>
                   <div>
@@ -833,8 +829,8 @@ export function DashboardView() {
                   <MailCheck size={18} />
                 </div>
                 <div className="toolkit-card-body">
-                  <h4>Deterministic Matching</h4>
-                  <p>Inbound emails with <code>JOB-XXXX</code> in the subject route straight to the right vacancy.</p>
+                  <h4>Automated Job Routing</h4>
+                  <p>Inbound applications with <code>JOB-XXXX</code> codes route directly to the matching vacancy pipeline.</p>
                   <div className="toolkit-card-action">
                     <Link to="/unmatched" className="inline-action-btn">
                       <Inbox size={13} /> View Inbound Queue &rarr;

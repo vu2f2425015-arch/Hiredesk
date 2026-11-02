@@ -14,10 +14,10 @@
   --text-secondary: #4a5365;
   --text-tertiary: #667085;
   --text-disabled: #98a2b3;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-text: #4338ca;
-  --accent-subtle: #eef0ff;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-text: #1d4ed8;
+  --accent-subtle: #eff6ff;
   --success: #0f7a53;
   --warning: #8a5a00;
   --danger: #b42318;
@@ -67,16 +67,16 @@
   --text-secondary: #b7c2d6;
   --text-tertiary: #8c9bb3;
   --text-disabled: #63738d;
-  --accent: #625cf5;
-  --accent-hover: #756ffc;
-  --accent-text: #aaa6ff;
-  --accent-subtle: rgba(115, 109, 252, 0.16);
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-text: #93c5fd;
+  --accent-subtle: rgba(59, 130, 246, 0.16);
   --success: #48d6a0;
   --warning: #f0b957;
   --danger: #ff858b;
   --info: #79b4ff;
   --bg-subtle: #151f31;
-  --primary-subtle: rgba(115, 109, 252, 0.18);
+  --primary-subtle: rgba(59, 130, 246, 0.18);
   --shadow-sm: 0 10px 30px rgba(0, 0, 0, 0.26);
   --shadow-dashboard: 0 10px 32px rgba(0, 0, 0, 0.24);
   --shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.28);
@@ -344,7 +344,7 @@ input::placeholder {
   border-radius: var(--radius-lg);
   padding: 1.75rem;
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
@@ -1619,7 +1619,7 @@ textarea:focus-visible {
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #3b82f6 100%);
+  background: var(--primary);
 }
 
 .dashboard-hero-content {

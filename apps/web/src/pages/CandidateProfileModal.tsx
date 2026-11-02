@@ -11,8 +11,8 @@ import {
   RefreshCw,
   Send,
   Calendar,
-  Sparkles,
-  Cpu,
+  FileCheck2,
+  BarChart2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -344,12 +344,9 @@ export function CandidateProfileModal({
               {/* Multi-Job Applications Section */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <h3 style={{ fontSize: '1.05rem', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
                     <Briefcase size={16} color="var(--primary)" /> Applications ({candidate.applications.length})
                   </h3>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                    Scoped to caller organization & client authorization
-                  </span>
                 </div>
 
                 <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
@@ -556,13 +553,13 @@ export function CandidateProfileModal({
                     </div>
                   </div>
 
-                  {/* Phase 8C: AI Recruiter Decision Support (Strictly Gated, Recruiter Only) */}
+                  {/* Candidate Resume & Skill Match Analysis */}
                   {!isClient && (
                     <div
                       style={{
-                        padding: '1.25rem',
-                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%)',
-                        border: '1px solid rgba(99, 102, 241, 0.25)',
+                        padding: '1.15rem',
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border-default)',
                         borderRadius: 'var(--radius-md)',
                         display: 'flex',
                         flexDirection: 'column',
@@ -571,26 +568,21 @@ export function CandidateProfileModal({
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <Sparkles size={18} color="var(--primary)" />
-                          <span style={{ fontWeight: 600, fontSize: '0.95rem' }}>AI Recruiter Decision Support</span>
+                          <FileCheck2 size={16} color="var(--primary)" />
+                          <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>Candidate Fit & Resume Analysis</span>
                           {aiEvaluation && (
                             <span
                               style={{
                                 fontSize: '0.72rem',
-                                padding: '0.2rem 0.6rem',
+                                padding: '0.15rem 0.5rem',
                                 borderRadius: '4px',
-                                background: 'rgba(99, 102, 241, 0.15)',
-                                color: 'var(--primary)',
-                                fontWeight: 700,
-                                border: '1px solid rgba(99, 102, 241, 0.3)',
-                                letterSpacing: '0.02em',
+                                background: 'var(--accent-subtle)',
+                                color: 'var(--accent-text)',
+                                fontWeight: 600,
+                                border: '1px solid var(--border-subtle)',
                               }}
                             >
-                              {aiEvaluation.provider === 'google_gemini'
-                                ? 'Google Gemini'
-                                : aiEvaluation.provider === 'openai'
-                                ? 'OpenAI GPT-4o'
-                                : 'Hiredesk AI Engine'}
+                              Automated Match
                             </span>
                           )}
                         </div>
@@ -607,8 +599,8 @@ export function CandidateProfileModal({
                             padding: '0.35rem 0.75rem',
                           }}
                         >
-                          {aiLoading ? <RefreshCw className="spin" size={14} /> : <Cpu size={14} />}
-                          <span>{aiEvaluation ? 'Re-Evaluate Fit' : 'Evaluate Job Fit'}</span>
+                          {aiLoading ? <RefreshCw className="spin" size={13} /> : <BarChart2 size={13} />}
+                          <span>{aiEvaluation ? 'Re-analyze Match' : 'Analyze Match'}</span>
                         </button>
                       </div>
 
@@ -723,11 +715,11 @@ export function CandidateProfileModal({
                           </div>
 
                           {aiEvaluation.interviewFocusAreas.length > 0 && (
-                            <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', background: 'rgba(255, 255, 255, 0.02)', padding: '0.65rem 0.85rem', borderRadius: '6px' }}>
-                              <strong style={{ color: 'var(--primary)', display: 'block', marginBottom: '0.25rem' }}>
-                                Recommended Interview Probing Areas:
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-main)', background: 'var(--bg-canvas)', border: '1px solid var(--border-subtle)', padding: '0.65rem 0.85rem', borderRadius: '6px' }}>
+                              <strong style={{ color: 'var(--text-main)', display: 'block', marginBottom: '0.25rem' }}>
+                                Suggested Interview Focus:
                               </strong>
-                              <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-muted)' }}>
+                              <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--text-secondary)' }}>
                                 {aiEvaluation.interviewFocusAreas.map((focus, i) => (
                                   <li key={i}>{focus}</li>
                                 ))}
@@ -735,13 +727,13 @@ export function CandidateProfileModal({
                             </div>
                           )}
 
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '0.4rem' }}>
-                            {aiEvaluation.decisionSupportDisclaimer}
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            Advisory match summary based on parsed candidate resume.
                           </div>
                         </div>
                       ) : (
                         <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                          Click "Evaluate Job Fit" to calculate deterministic skill overlap and qualitative decision support for this position.
+                          Compare candidate resume against role requirements to review skill overlap and interview topics.
                         </div>
                       )}
                     </div>
