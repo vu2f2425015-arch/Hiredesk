@@ -198,7 +198,7 @@ export function PublicCareerView() {
               <div>
                 <h4 className="career-section-title">Desired Skills</h4>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {selectedJob.skills.map((skill, i) => (
+                  {selectedJob.skills.map((skill: string, i: number) => (
                     <span key={i} className="career-skill-tag">
                       {skill}
                     </span>

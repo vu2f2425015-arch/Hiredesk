@@ -58,7 +58,31 @@ export async function safeParseJson<T = any>(
  */
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const url = `${API_BASE}${input}`;
-  const res = await fetch(url, init);
+  const controller = new AbortController();
+  const callerSignal = init?.signal;
+  const REQUEST_TIMEOUT_MS = 70_000;
+  let timedOut = false;
+  const timeoutId = globalThis.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, REQUEST_TIMEOUT_MS);
+  const abortFromCaller = () => controller.abort(callerSignal?.reason);
+
+  if (callerSignal?.aborted) abortFromCaller();
+  else callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+
+  let res: Response;
+  try {
+    res = await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) {
+      throw new Error('The server took too long to respond. It may be starting after inactivity; please try again.');
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+    callerSignal?.removeEventListener('abort', abortFromCaller);
+  }
 
   // Wrap res.json() to prevent SyntaxError on empty / HTML responses
   res.json = async function <T = any>(): Promise<T> {
@@ -359,10 +383,12 @@ export interface ApplicationItem {
 
 export async function fetchJobApplications(
   token: string,
-  jobId: string
+  jobId: string,
+  signal?: AbortSignal
 ): Promise<{ applications: ApplicationItem[]; total: number }> {
   const res = await apiFetch(`/api/jobs/${jobId}/applications`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal,
   });
   const json = await res.json();
   if (!res.ok || !json.success) {

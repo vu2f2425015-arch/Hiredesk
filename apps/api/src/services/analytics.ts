@@ -20,7 +20,7 @@ interface CachedMetrics {
 }
 
 const metricsCache = new Map<string, CachedMetrics>();
-const METRICS_CACHE_TTL_MS = 15 * 1000;
+const METRICS_CACHE_TTL_MS = 10 * 1000;
 
 export function invalidateMetricsCache(organizationId?: string): void {
   if (!organizationId) {

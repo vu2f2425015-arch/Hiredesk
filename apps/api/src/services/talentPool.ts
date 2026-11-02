@@ -19,7 +19,7 @@ interface CachedTalentPoolEntry<T> {
 }
 
 const talentPoolCache = new Map<string, CachedTalentPoolEntry<any>>();
-const TALENT_POOL_CACHE_TTL_MS = 30 * 1000; // 30 seconds TTL
+const TALENT_POOL_CACHE_TTL_MS = 10 * 1000; // Keep profile counts aligned with dashboard metric freshness.
 
 export function invalidateTalentPoolCache(organizationId?: string): void {
   if (!organizationId) {
@@ -108,9 +108,9 @@ export class TalentPoolService {
 
     // Filter by skills
     if (query.skills) {
-      const skillsArray = Array.isArray(query.skills)
+      const skillsArray: string[] = Array.isArray(query.skills)
         ? query.skills
-        : query.skills.split(',').map((s) => s.trim()).filter(Boolean);
+        : query.skills.split(',').map((skill: string) => skill.trim()).filter(Boolean);
       if (skillsArray.length > 0) {
         where.skills = {
           hasSome: skillsArray,

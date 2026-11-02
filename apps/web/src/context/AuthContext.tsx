@@ -115,17 +115,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 1. Restore active session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      if (currentSession?.access_token) {
-        fetchProfile(currentSession.access_token).finally(() =>
-          setLoading(false),
-        );
-      } else {
+    supabase.auth.getSession()
+      .then(({ data: { session: currentSession } }) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        if (currentSession?.access_token) {
+          fetchProfile(currentSession.access_token).finally(() =>
+            setLoading(false),
+          );
+        } else {
+          setLoading(false);
+        }
+      })
+      .catch((error: unknown) => {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setPermissions(null);
+        setProfileError(error instanceof Error ? error.message : 'Could not restore your session. Please sign in again.');
         setLoading(false);
-      }
-    });
+      });
 
     // 2. Listen to auth changes
     const {

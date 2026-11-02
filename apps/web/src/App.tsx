@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { Activity, BriefcaseBusiness, Keyboard, LogIn, Search, UserPlus } from 'lucide-react';
 import { UserRole } from '@hiredesk/shared';
@@ -11,7 +11,7 @@ import { CookieBanner } from './components/CookieBanner';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { PageLoadingSkeleton } from './components/PageLoadingSkeleton';
 import { AppShell as WorkspaceShell } from './components/shell/AppShell';
-import { API_BASE } from './lib/config';
+import { apiFetch } from './lib/api';
 
 // Code-split page views remain unchanged by the dashboard redesign.
 const DashboardView = lazy(() => import('./pages/DashboardView').then((m) => ({ default: m.DashboardView })));
@@ -95,21 +95,27 @@ function AppFrame() {
     return () => window.removeEventListener('keydown', handleShortcuts);
   }, []);
 
-  useEffect(() => {
-    fetch(`${API_BASE}/api/health`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((json) => {
-        if (json.success && json.data) setHealth(json.data as HealthResponse);
-        else throw new Error('Malformed health response');
-      })
-      .catch((loadError: unknown) => {
-        setHealthError(loadError instanceof Error ? loadError.message : 'Health check failed');
-      })
-      .finally(() => setHealthLoading(false));
+  const loadHealth = useCallback(async () => {
+    setHealthLoading(true);
+    setHealthError(null);
+    try {
+      const res = await apiFetch('/api/health');
+      const json = await res.json();
+      if (!res.ok || !json.success || !json.data) {
+        throw new Error(json.error?.message || `Health check failed (${res.status})`);
+      }
+      setHealth(json.data as HealthResponse);
+    } catch (loadError: unknown) {
+      setHealth(null);
+      setHealthError(loadError instanceof Error ? loadError.message : 'Health check failed');
+    } finally {
+      setHealthLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadHealth();
+  }, [loadHealth]);
 
   const healthStatus = healthLoading ? 'loading' : health?.status === 'ok' ? 'ok' : 'error';
   const routes = (
@@ -174,7 +180,7 @@ function AppFrame() {
             </ProtectedRoute>
           }
         />
-        <Route path="/system-status" element={<SystemStatusView health={health} loading={healthLoading} error={healthError} />} />
+        <Route path="/system-status" element={<SystemStatusView health={health} loading={healthLoading} error={healthError} onRetry={() => void loadHealth()} />} />
       </Routes>
     </Suspense>
   );
@@ -228,10 +234,10 @@ function AppFrame() {
                   <strong>HiredeskHR</strong>
                 </div>
                 <p className="public-footer-desc">
-                  High-performance applicant tracking system and candidate intelligence platform built for modern recruitment agencies.
+                  Recruitment workspace for agency vacancies, applications, candidate records, and client reviews.
                 </p>
                 <div className="public-footer-status">
-                  <span className="status-live-dot" /> All Cloud Systems Operational
+                  API availability is shown on the system status page.
                 </div>
               </div>
               <div className="public-footer-links">
@@ -242,16 +248,16 @@ function AppFrame() {
                   <NavLink to="/system-status">System Health</NavLink>
                 </div>
                 <div className="footer-links-col">
-                  <strong>Security & Infrastructure</strong>
-                  <span>Multi-Tenant RBAC</span>
-                  <span>PostgreSQL Pooler</span>
-                  <span>Autonomous IMAP</span>
+                  <strong>Workspace</strong>
+                  <span>Organization-scoped records</span>
+                  <span>Role-based access</span>
+                  <span>Inbound email processing</span>
                 </div>
               </div>
             </div>
             <div className="public-footer-bottom">
               <span>© {new Date().getFullYear()} HiredeskHR. All rights reserved.</span>
-              <span>Enterprise Agency Recruitment Architecture</span>
+              <span>Recruitment workspace for agencies</span>
             </div>
           </footer>
         </>
@@ -264,15 +270,20 @@ function SystemStatusView({
   health,
   loading,
   error,
+  onRetry,
 }: {
   health: HealthResponse | null;
   loading: boolean;
   error: string | null;
+  onRetry: () => void;
 }) {
   return (
     <div className="dashboard-panel system-status-panel">
       <div className="panel-heading">
-        <div><h1>System status</h1><p>API process health and service details.</p></div>
+        <div><h1>System status</h1><p>API process health. Database and mail-worker health are not included.</p></div>
+        <button type="button" className="button-secondary" onClick={onRetry} disabled={loading}>
+          {loading ? 'Checking…' : 'Check again'}
+        </button>
       </div>
       {loading ? (
         <p className="status-message" role="status">Checking the API health endpoint…</p>

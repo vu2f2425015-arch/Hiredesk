@@ -71,6 +71,7 @@ export function InterviewsView() {
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const [applicationsError, setApplicationsError] = useState<string | null>(null);
+  const [applicationsRetryKey, setApplicationsRetryKey] = useState(0);
   const [loading, setLoading] = useState<boolean>(interviews.length === 0);
   const [error, setError] = useState<string | null>(null);
 
@@ -219,6 +220,7 @@ export function InterviewsView() {
       return;
     }
     let active = true;
+    const controller = new AbortController();
     const cacheKey = orgId ? `hd_job_applications_${orgId}_${scheduleForm.jobId}` : null;
     try {
       const cached = cacheKey ? sessionStorage.getItem(cacheKey) : null;
@@ -229,7 +231,7 @@ export function InterviewsView() {
     }
     setApplicationsLoading(true);
     setApplicationsError(null);
-    fetchJobApplications(token, scheduleForm.jobId)
+    fetchJobApplications(token, scheduleForm.jobId, controller.signal)
       .then((result) => {
         if (!active) return;
         setApplications(result.applications);
@@ -238,11 +240,16 @@ export function InterviewsView() {
         }
       })
       .catch((err: unknown) => {
-        if (active) setApplicationsError(err instanceof Error ? err.message : 'Could not load candidates for this job.');
+        if (active && !(err instanceof DOMException && err.name === 'AbortError')) {
+          setApplicationsError(err instanceof Error ? err.message : 'Could not load candidates for this job.');
+        }
       })
       .finally(() => { if (active) setApplicationsLoading(false); });
-    return () => { active = false; };
-  }, [isScheduleOpen, token, orgId, scheduleForm.jobId]);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [isScheduleOpen, token, orgId, scheduleForm.jobId, applicationsRetryKey]);
 
   const handleOpenScheduleForRequest = (req: ApiPendingInterviewRequest) => {
     setScheduleForm({
@@ -1038,7 +1045,19 @@ export function InterviewsView() {
                         </option>
                         {applications.map((application) => <option key={application.id} value={application.id}>{application.candidate.name} · {application.candidate.candidateCode}</option>)}
                       </select>
-                      {applicationsError && <span className="schedule-field-hint schedule-field-error">{applicationsError}</span>}
+                      {applicationsError && (
+                        <span className="schedule-field-hint schedule-field-error" role="alert">
+                          {applicationsError}{' '}
+                          <button
+                            type="button"
+                            className="schedule-field-retry"
+                            onClick={() => setApplicationsRetryKey((key) => key + 1)}
+                            disabled={applicationsLoading}
+                          >
+                            Retry
+                          </button>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </section>

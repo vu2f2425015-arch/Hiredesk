@@ -159,7 +159,7 @@ describe('Phase 8C: AI Recruiter Decision Support API', () => {
       expect(data.provider).toBe('deterministic_baseline');
       expect(data.model).toBeNull();
       expect(data.limitationNotice).toBe(
-        'No external AI provider configured. Evaluated using deterministic skill/requirement overlap baseline.'
+        'No supported external AI provider configured. Evaluated using deterministic skill/requirement overlap baseline.'
       );
 
       // Verify exact skill math (3 matched out of 4 required = 0.75)

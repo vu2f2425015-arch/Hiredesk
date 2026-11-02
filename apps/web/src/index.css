@@ -1281,7 +1281,7 @@ textarea:focus-visible {
 .metrics-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .metric-card { padding: 22px 20px; border-radius: var(--radius-lg); background: var(--bg-surface); border: 1px solid var(--border-subtle); backdrop-filter: blur(12px); text-align: left; transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); }
 .metric-card:hover { transform: translateY(-3px); border-color: var(--accent-text); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08); }
-.metric-value { font-size: 34px; font-weight: 800; letter-spacing: -0.04em; color: var(--text-primary); line-height: 1; }
+.metric-value { display: flex; align-items: center; min-height: 34px; font-size: 34px; font-weight: 800; letter-spacing: -0.04em; color: var(--accent-text); line-height: 1; }
 .metric-accent { color: var(--accent-text); }
 .metric-label { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-top: 8px; }
 .metric-subtext { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; line-height: 1.4; }
@@ -1300,7 +1300,8 @@ textarea:focus-visible {
 .dot-yellow { background: #f59e0b; }
 .dot-green { background: #10b981; }
 .showcase-window-address { font-size: 11px; font-family: monospace; color: var(--text-tertiary); background: var(--bg-surface); padding: 4px 14px; border-radius: 9999px; border: 1px solid var(--border-subtle); }
-.showcase-window-status { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--success); }
+.showcase-window-status { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--success); }
+.showcase-window-status.sample-workspace-label { color: var(--text-secondary); }
 .showcase-tab-bar { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface); }
 .showcase-tab-button { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; font-size: 12px; font-weight: 600; border: 1px solid transparent; background: transparent; color: var(--text-secondary); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease; }
 .showcase-tab-button:hover { color: var(--text-primary); background: var(--bg-hover); }
@@ -1559,6 +1560,9 @@ textarea:focus-visible {
 .schedule-field-hint { color: var(--text-tertiary); font-size: 10px; }
 .schedule-field-hint-inline { margin-left: 4px; color: var(--text-tertiary); font-size: 10px; font-weight: 400; }
 .schedule-field-error { color: var(--danger); }
+.schedule-field-retry { border: 0; padding: 2px 4px; background: transparent; color: var(--accent-text); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.schedule-field-retry:hover { color: var(--accent-hover); }
+.schedule-field-retry:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; border-radius: 3px; }
 .schedule-form-error { margin: 14px 24px 0; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border-subtle)); border-radius: 8px; background: color-mix(in srgb, var(--danger) 8%, var(--bg-surface)); color: var(--danger); font-size: 11px; line-height: 1.5; }
 .schedule-modal-footer { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: 8px; padding: 14px 24px; border-top: 1px solid var(--border-subtle); background: var(--bg-raised); }
 .schedule-modal-footer .button-primary, .schedule-modal-footer .button-secondary { min-height: 40px; }

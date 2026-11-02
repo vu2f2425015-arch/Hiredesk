@@ -569,7 +569,7 @@ export function CandidateProfileModal({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <FileCheck2 size={16} color="var(--primary)" />
-                          <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>Candidate Fit & Resume Analysis</span>
+                          <span style={{ fontWeight: 600, fontSize: '0.92rem' }}>Candidate Fit Summary</span>
                           {aiEvaluation && (
                             <span
                               style={{
@@ -582,7 +582,7 @@ export function CandidateProfileModal({
                                 border: '1px solid var(--border-subtle)',
                               }}
                             >
-                              Automated Match
+                              {aiEvaluation.provider === 'google_gemini' ? 'Gemini-assisted analysis' : 'Deterministic skill overlap'}
                             </span>
                           )}
                         </div>
@@ -605,7 +605,7 @@ export function CandidateProfileModal({
                       </div>
 
                       {aiError && (
-                        <div style={{ color: '#ef4444', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div role="alert" style={{ color: '#ef4444', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <AlertCircle size={14} /> {aiError}
                         </div>
                       )}

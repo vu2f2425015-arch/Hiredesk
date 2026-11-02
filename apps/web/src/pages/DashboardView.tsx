@@ -75,6 +75,18 @@ function getStageCount(stageCounts: Record<string, number> | undefined, stageVal
   return matchedKey ? stageCounts[matchedKey] : 0;
 }
 
+function getActivePipelineCount(stageCounts: Record<string, number> | undefined): number {
+  return [
+    ApplicationStage.APPLIED,
+    ApplicationStage.SCREENING,
+    ApplicationStage.SHORTLISTED,
+    ApplicationStage.INTERVIEW,
+    ApplicationStage.AI_INTERVIEW,
+    ApplicationStage.CLIENT_REVIEW,
+    ApplicationStage.SELECTED,
+  ].reduce((total, stage) => total + getStageCount(stageCounts, stage), 0);
+}
+
 function PublicHome() {
   const [activeTab, setActiveTab] = useState<'pipeline' | 'inbound' | 'client'>('pipeline');
 
@@ -94,8 +106,8 @@ function PublicHome() {
         </h1>
 
         <p className="hero-description">
-          Publish vacancies, match candidate resumes to roles, track interview pipelines,
-          and collaborate on client feedback — all in one centralized workspace.
+          Publish vacancies, collect applications, review candidate pipelines,
+          and collaborate with clients in one agency workspace.
         </p>
 
         <div className="hero-actions">
@@ -106,48 +118,48 @@ function PublicHome() {
             Sign in to workspace
           </Link>
           <Link className="hero-status-pill" to="/system-status">
-            <span className="status-live-dot" /> All systems operational
+            <Activity size={14} aria-hidden="true" /> View API status
           </Link>
         </div>
 
         <div className="hero-trust-strip">
-          <span className="hero-trust-item"><Zap size={14} /> Instant Workspace Setup</span>
-          <span className="hero-trust-item"><ShieldCheck size={14} /> Multi-Tenant RBAC</span>
-          <span className="hero-trust-item"><MailCheck size={14} /> Autonomous IMAP Parsing</span>
-          <span className="hero-trust-item"><Activity size={14} /> Real-Time Analytics</span>
+          <span className="hero-trust-item"><Zap size={14} /> Agency-focused workflow</span>
+          <span className="hero-trust-item"><ShieldCheck size={14} /> Role-scoped access</span>
+          <span className="hero-trust-item"><MailCheck size={14} /> Inbound resume processing</span>
+          <span className="hero-trust-item"><Activity size={14} /> Database-backed reports</span>
         </div>
       </section>
 
-      {/* Metrics & Performance Strip */}
-      <section className="metrics-strip" aria-label="Key platform metrics">
+      {/* Product capabilities; performance and security claims are intentionally not fabricated. */}
+      <section className="metrics-strip" aria-label="Recruitment workflow capabilities">
         <div className="metric-card">
-          <div className="metric-value">10<span className="metric-accent">x</span></div>
-          <div className="metric-label">Faster Ingestion</div>
-          <div className="metric-subtext">Automated IMAP parsing & resume attachment extraction</div>
+          <div className="metric-value"><BriefcaseBusiness size={24} aria-hidden="true" /></div>
+          <div className="metric-label">Vacancy job codes</div>
+          <div className="metric-subtext">Give each opening a reference for applications and inbound resumes.</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value">100<span className="metric-accent">%</span></div>
-          <div className="metric-label">Tenant Isolation</div>
-          <div className="metric-subtext">Organization-scoped data partitioning & strict RBAC</div>
+          <div className="metric-value"><MailCheck size={24} aria-hidden="true" /></div>
+          <div className="metric-label">Resume intake</div>
+          <div className="metric-subtext">Collect resumes from the career page or a configured inbound mailbox.</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value">&lt;200<span className="metric-accent">ms</span></div>
-          <div className="metric-label">Query Latency</div>
-          <div className="metric-subtext">PostgreSQL sequence generation & connection pooling</div>
+          <div className="metric-value"><Layers size={24} aria-hidden="true" /></div>
+          <div className="metric-label">Application stages</div>
+          <div className="metric-subtext">Track applications as recruiters review and progress candidates.</div>
         </div>
         <div className="metric-card">
-          <div className="metric-value">99.9<span className="metric-accent">%</span></div>
-          <div className="metric-label">Operational SLA</div>
-          <div className="metric-subtext">High-availability cloud persistence & resilient APIs</div>
+          <div className="metric-value"><Users size={24} aria-hidden="true" /></div>
+          <div className="metric-label">Client collaboration</div>
+          <div className="metric-subtext">Share candidate reviews through role-scoped client access.</div>
         </div>
       </section>
 
       {/* Interactive Product Showcase Window */}
-      <section className="product-showcase-section" aria-label="Live product preview">
+      <section className="product-showcase-section" aria-label="Illustrative product tour">
         <div className="section-header-center">
           <p className="section-eyebrow">Interactive Product Tour</p>
           <h2 className="section-heading">Designed for Speed, Precision, and Collaboration</h2>
-          <p className="section-subtext">Explore how HiredeskHR powers the end-to-end recruitment lifecycle.</p>
+          <p className="section-subtext">Explore the workflow using clearly labeled sample content.</p>
         </div>
 
         <div className="showcase-window">
@@ -161,8 +173,8 @@ function PublicHome() {
             <div className="showcase-window-address">
               <span>https://hiredesk.agency/workspace/active-pipeline</span>
             </div>
-            <div className="showcase-window-status">
-              <span className="status-live-dot" /> Live Workspace
+            <div className="showcase-window-status sample-workspace-label">
+              Sample workspace · illustrative data
             </div>
           </div>
 
@@ -209,9 +221,9 @@ function PublicHome() {
                   <div className="mock-candidate-card">
                     <div className="mock-card-top">
                       <span className="mock-job-code">JOB-1042</span>
-                      <span className="mock-fit-pill">96% Match</span>
+                      <span className="mock-fit-pill">New application</span>
                     </div>
-                    <div className="mock-cand-name">Elena Rostova</div>
+                    <div className="mock-cand-name">Sample candidate A</div>
                     <div className="mock-cand-role">Senior Full-Stack Engineer</div>
                     <div className="mock-card-meta">
                       <span>2h ago</span>
@@ -221,9 +233,9 @@ function PublicHome() {
                   <div className="mock-candidate-card">
                     <div className="mock-card-top">
                       <span className="mock-job-code">JOB-1039</span>
-                      <span className="mock-fit-pill">88% Match</span>
+                      <span className="mock-fit-pill">Resume received</span>
                     </div>
-                    <div className="mock-cand-name">Marcus Vance</div>
+                    <div className="mock-cand-name">Sample candidate B</div>
                     <div className="mock-cand-role">Cloud Infrastructure Lead</div>
                     <div className="mock-card-meta">
                       <span>4h ago</span>
@@ -242,11 +254,11 @@ function PublicHome() {
                       <span className="mock-job-code">JOB-1042</span>
                       <span className="mock-fit-pill pill-accent">Shortlisted</span>
                     </div>
-                    <div className="mock-cand-name">Sarah Jenkins</div>
+                    <div className="mock-cand-name">Sample candidate C</div>
                     <div className="mock-cand-role">Staff Frontend Architect</div>
                     <div className="mock-card-meta">
                       <span>Recruiter: Alex M.</span>
-                      <span className="mock-tag">Resume Verified</span>
+                      <span className="mock-tag">Application reviewed</span>
                     </div>
                   </div>
                 </div>
@@ -261,7 +273,7 @@ function PublicHome() {
                       <span className="mock-job-code">JOB-1038</span>
                       <span className="mock-fit-pill pill-warning">Awaiting Client</span>
                     </div>
-                    <div className="mock-cand-name">David Chen</div>
+                    <div className="mock-cand-name">Sample candidate D</div>
                     <div className="mock-cand-role">Senior Product Designer</div>
                     <div className="mock-card-meta">
                       <span>Shared with Acme Corp</span>
@@ -277,12 +289,12 @@ function PublicHome() {
                   <div className="mock-candidate-card">
                     <div className="mock-card-top">
                       <span className="mock-job-code">JOB-1035</span>
-                      <span className="mock-fit-pill pill-success">Confirmed</span>
+                      <span className="mock-fit-pill pill-success">Interview stage</span>
                     </div>
-                    <div className="mock-cand-name">Priya Patel</div>
+                    <div className="mock-cand-name">Sample candidate E</div>
                     <div className="mock-cand-role">Principal Engineer</div>
                     <div className="mock-card-meta">
-                      <span>Tomorrow, 2:00 PM</span>
+                      <span>Example interview</span>
                     </div>
                   </div>
                 </div>
@@ -297,22 +309,21 @@ function PublicHome() {
                 <div className="mock-inbound-card">
                   <div className="mock-inbound-header">
                     <div className="inbound-from-chip">
-                      <MailCheck size={16} /> From: alex.turner@developer.io
+                      <MailCheck size={16} /> From: candidate@example.com
                     </div>
-                    <span className="mock-fit-pill pill-success">✓ Auto-Matched to JOB-1042</span>
+                    <span className="mock-fit-pill pill-success">Matched by job code · example</span>
                   </div>
                   <div className="mock-inbound-body">
                     <strong>Subject: Application for Senior Full-Stack Engineer (JOB-1042)</strong>
                     <p className="mock-inbound-text">
-                      "Hi Hiring Team, please find attached my resume for the Senior Full-Stack vacancy (Ref: JOB-1042).
-                      I have 8+ years experience in TypeScript, React, and cloud native architectures..."
+                      "Hello, I am applying for the example vacancy. Please see my attached resume."
                     </p>
                     <div className="mock-attachment-pill">
                       <FileText size={15} /> alex_turner_resume.pdf <span className="mock-filesize">142 KB</span>
                     </div>
                   </div>
                   <div className="mock-inbound-footer">
-                    <span className="inbound-rule-tag">Gmail IMAP Poller: Received & Parsed in 420ms</span>
+                    <span className="inbound-rule-tag">Example inbound message · sample data</span>
                     <span className="button-primary mock-btn-sm">Move to Screening →</span>
                   </div>
                 </div>
@@ -326,22 +337,22 @@ function PublicHome() {
               <div className="mock-client-portal">
                 <div className="mock-client-header">
                   <div className="mock-client-brand">
-                    <Building2 size={18} /> Acme Global Technologies
+                    <Building2 size={18} /> Sample client company
                   </div>
                   <span className="mock-client-role-badge">Client Reviewer Portal</span>
                 </div>
                 <div className="mock-client-candidate-dossier">
                   <div className="dossier-info">
-                    <h3>Elena Rostova</h3>
+                    <h3>Sample candidate A</h3>
                     <p className="dossier-role">Candidate for: Senior Full-Stack Engineer (JOB-1042)</p>
                     <p className="dossier-recruiter-notes">
-                      <strong>Recruiter Note:</strong> Excellent culture fit, strong system design background, passed technical pre-screen with 96% score. Ready for final interview.
+                      <strong>Example recruiter note:</strong> Sample content for demonstrating the client review layout.
                     </p>
                   </div>
                   <div className="dossier-actions">
-                    <button type="button" className="button-primary mock-btn-sm"><Check size={14} /> Request Interview</button>
-                    <button type="button" className="button-secondary mock-btn-sm">Review Portfolio</button>
-                    <button type="button" className="button-secondary mock-btn-sm text-danger">Decline Candidate</button>
+                    <button type="button" className="button-primary mock-btn-sm" disabled title="Illustrative control in the product tour"><Check size={14} /> Request Interview</button>
+                    <button type="button" className="button-secondary mock-btn-sm" disabled title="Illustrative control in the product tour">Review Portfolio</button>
+                    <button type="button" className="button-secondary mock-btn-sm text-danger" disabled title="Illustrative control in the product tour">Decline Candidate</button>
                   </div>
                 </div>
               </div>
@@ -353,46 +364,46 @@ function PublicHome() {
       {/* Feature Capabilities Grid */}
       <section className="features-section" aria-label="Platform capabilities">
         <div className="section-header-center">
-          <p className="section-eyebrow">Enterprise Capabilities</p>
+          <p className="section-eyebrow">Platform capabilities</p>
           <h2 className="section-heading">Built specifically for high-volume recruitment</h2>
-          <p className="section-subtext">Every feature is designed to reduce manual effort, eliminate misallocated resumes, and boost placement speed.</p>
+          <p className="section-subtext">Tools for organizing vacancies, applications, candidate records, and client reviews.</p>
         </div>
 
         <div className="features-grid">
           <article className="feature-bento-card">
             <div className="feature-icon-box"><Zap size={20} /></div>
-            <h3>Atomic Code Sequences</h3>
-            <p>PostgreSQL sequences guarantee deterministic, collision-free <code>JOB-XXXX</code> and <code>CAND-XXXX</code> codes across concurrent recruiters.</p>
+            <h3>Vacancy job codes</h3>
+            <p>Each vacancy receives a job code recruiters can use to associate incoming applications with the right opening.</p>
           </article>
 
           <article className="feature-bento-card">
             <div className="feature-icon-box"><MailCheck size={20} /></div>
-            <h3>Autonomous IMAP Parsing</h3>
-            <p>Integrated background workers continuously poll Gmail mailboxes, extract MIME resume attachments, and automatically associate candidates with the right opening.</p>
+            <h3>Inbound resume processing</h3>
+            <p>A configured mailbox can be polled for application emails and resume attachments. Job codes help route applications to an opening.</p>
           </article>
 
           <article className="feature-bento-card">
             <div className="feature-icon-box"><ShieldCheck size={20} /></div>
-            <h3>Strict Multi-Tenant RBAC</h3>
-            <p>Role-scoped isolation protects sensitive data across Super Admins, Branch Managers, Recruiters, and external Client Reviewers with zero leakage.</p>
+            <h3>Role-scoped workspace access</h3>
+            <p>Workspace roles determine which recruitment and client review areas a signed-in user can access.</p>
           </article>
 
           <article className="feature-bento-card">
             <div className="feature-icon-box"><Users size={20} /></div>
-            <h3>Dynamic Talent Pool Folders</h3>
-            <p>Curate candidate lists across departments, maintain a centralized talent bench, and instantly redeploy silver medalists to new vacancies.</p>
+            <h3>Candidate folders</h3>
+            <p>Organize candidate records into folders and associate candidates with relevant job openings.</p>
           </article>
 
           <article className="feature-bento-card">
             <div className="feature-icon-box"><FileText size={20} /></div>
-            <h3>Comprehensive Audit Trail</h3>
-            <p>Every pipeline transition, client comment, interview invite, and stage change is immutably logged with actor attribution and timestamps.</p>
+            <h3>Recruitment activity</h3>
+            <p>Review workspace activity and application stage changes alongside vacancy and candidate information.</p>
           </article>
 
           <article className="feature-bento-card">
             <div className="feature-icon-box"><Activity size={20} /></div>
-            <h3>Live Health Diagnostics</h3>
-            <p>Real-time visibility into database connection pool status, worker heartbeats, and API response latencies ensures 99.9% uptime confidence.</p>
+            <h3>API health check</h3>
+            <p>Check whether the API service responds. Database and mail-worker health are not currently reported on this page.</p>
           </article>
         </div>
       </section>
@@ -414,14 +425,14 @@ function PublicHome() {
           <div className="workflow-step-arrow" aria-hidden="true"><ArrowRight size={22} /></div>
           <div className="workflow-step-card">
             <div className="step-number-badge">02</div>
-            <h3>Automated Matching & Staging</h3>
-            <p>Inbound emails and web applications are automatically parsed, resumes stored securely, and staged in your live Kanban pipeline.</p>
+            <h3>Route and review applications</h3>
+            <p>Applications with a matching job code can be associated with a vacancy, then advanced through recruiter-managed stages.</p>
           </div>
           <div className="workflow-step-arrow" aria-hidden="true"><ArrowRight size={22} /></div>
           <div className="workflow-step-card">
             <div className="step-number-badge">03</div>
             <h3>Collaborate & Close</h3>
-            <p>Invite clients to review shortlisted profiles in their dedicated portal. Collect approvals and schedule interviews in one click.</p>
+            <p>Share shortlisted candidates for client review. Recruiters can schedule interviews and add meeting details in the workspace.</p>
           </div>
         </div>
       </section>
@@ -430,8 +441,8 @@ function PublicHome() {
       <section className="cta-banner" aria-label="Get started">
         <div className="cta-banner-content">
           <span className="hero-badge-dot" aria-hidden="true" />
-          <h2>Ready to Modernize Your Recruitment Agency?</h2>
-          <p>Join leading recruitment teams who hire faster, manage pipelines cleaner, and keep clients thrilled.</p>
+          <h2>Bring your recruitment workflow together</h2>
+          <p>Manage vacancies, applications, candidate records, and client reviews in one agency workspace.</p>
           <div className="cta-banner-actions">
             <Link className="button-primary hero-btn-lg" to="/register">
               Register your agency <ArrowRight size={17} />
@@ -709,21 +720,21 @@ export function DashboardView() {
               to="/jobs"
             />
             <StatCard
-              label="Talent Pool"
+              label="Candidate Profiles"
               value={metrics.totalCandidates}
-              description="Unique candidates across vacancies"
+              description="Candidate records in your agency workspace"
               icon={<Users size={18} />}
               tone="violet"
-              badge={metrics.totalCandidates > 0 ? `${metrics.totalCandidates} Sourced` : '0 Candidates'}
+              badge={metrics.totalCandidates > 0 ? 'In workspace' : 'No profiles yet'}
               to="/talent-pool"
             />
             <StatCard
               label="Active Pipeline"
-              value={metrics.totalApplications}
-              description="Candidates across all stages"
+              value={getActivePipelineCount(metrics.stageCounts)}
+              description="Applications not yet hired or closed"
               icon={<FileText size={18} />}
               tone="emerald"
-              badge={metrics.totalApplications > 0 ? `${metrics.totalApplications} In Review` : 'Ready'}
+              badge={getActivePipelineCount(metrics.stageCounts) > 0 ? `${getActivePipelineCount(metrics.stageCounts)} active` : 'No active applications'}
               to="/jobs"
             />
             <StatCard
@@ -732,7 +743,7 @@ export function DashboardView() {
               description="New applications in last 7 days"
               icon={<Zap size={18} />}
               tone="amber"
-              badge="Autonomous IMAP"
+              badge="Past 7 days"
               to="/unmatched"
             />
           </section>

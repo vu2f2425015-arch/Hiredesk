@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { prisma } from '@hiredesk/database';
 import { BootstrapSuperAdminSchema, UserRole } from '@hiredesk/shared';
 import { config } from '../config/index.js';
@@ -7,6 +8,17 @@ import { logger } from '../utils/logger.js';
 
 export const bootstrapRouter = Router();
 
+const bootstrapLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => config.NODE_ENV === 'test',
+  handler: (_req: Request, res: Response) => {
+    sendError(res, 'RATE_LIMIT_EXCEEDED', 'Too many bootstrap attempts. Please wait before trying again.', 429);
+  },
+});
+
 /**
  * Safe initial platform bootstrap route.
  * Can ONLY succeed if:
@@ -14,7 +26,7 @@ export const bootstrapRouter = Router();
  * 2. Zero super_admin profiles exist in the database.
  * Once a super_admin exists, this endpoint permanently refuses new requests with 409 Conflict.
  */
-bootstrapRouter.post('/bootstrap/super-admin', async (req: Request, res: Response) => {
+bootstrapRouter.post('/bootstrap/super-admin', bootstrapLimiter, async (req: Request, res: Response) => {
   const parseResult = BootstrapSuperAdminSchema.safeParse(req.body);
   if (!parseResult.success) {
     sendError(res, 'VALIDATION_ERROR', 'Invalid bootstrap payload', 400, parseResult.error.flatten().fieldErrors);

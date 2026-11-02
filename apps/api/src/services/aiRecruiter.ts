@@ -103,13 +103,11 @@ export class AiRecruiterService {
 
   /**
    * GET /api/ai-recruiter/status
-   * Reports active AI provider status. Always active via Hiredesk AI Engine
-   * or external Google Gemini/OpenAI if configured.
+   * Reports the provider that actually performs the evaluation. Without a
+   * configured Gemini integration, evaluations use deterministic skill overlap.
    */
   static getStatus(): AiRecruiterStatusDto {
     const hasGemini = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
-    const hasOpenAI = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim().length > 0);
-
     if (hasGemini) {
       return {
         providerConfigured: true,
@@ -125,32 +123,12 @@ export class AiRecruiterService {
       };
     }
 
-    if (hasOpenAI) {
-      return {
-        providerConfigured: true,
-        providerName: 'openai',
-        model: 'gpt-4o-mini',
-        capabilities: [
-          'ai_semantic_matching',
-          'qualitative_strength_analysis',
-          'interview_focus_recommendations',
-          'resume_skill_extraction',
-        ],
-        message: 'AI Provider active: OpenAI. AI decision support enabled with prompt injection defenses.',
-      };
-    }
-
     return {
-      providerConfigured: true,
-      providerName: 'hiredesk_ai',
-      model: 'hiredesk-neural-v2',
-      capabilities: [
-        'ai_semantic_matching',
-        'qualitative_strength_analysis',
-        'interview_focus_recommendations',
-        'resume_skill_extraction',
-      ],
-      message: 'AI Recruiter Decision Support active. Neural evaluation and candidate fit modeling operational.',
+      providerConfigured: false,
+      providerName: 'deterministic_baseline',
+      model: null,
+      capabilities: ['deterministic_skill_overlap'],
+      message: 'No external AI provider configured. Candidate matching uses deterministic skill and requirement overlap.',
     };
   }
 
@@ -350,8 +328,6 @@ export class AiRecruiterService {
 
     const now = new Date().toISOString();
     const hasGemini = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
-    const hasOpenAI = Boolean(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.trim().length > 0);
-
     // 7. External Gemini provider call if configured
     if (hasGemini) {
       try {
@@ -397,22 +373,26 @@ export class AiRecruiterService {
           };
         }
       } catch (geminiError) {
-        logger.warn(
+          logger.warn(
           { err: geminiError, applicationId: application.id },
-          'External Gemini evaluation encountered error; falling back to Hiredesk AI engine'
+          'External Gemini evaluation encountered error; falling back to deterministic skill overlap'
         );
       }
     }
 
-    // 8. Hiredesk AI Neural Engine return
+    // 8. Deterministic baseline return
     return {
       applicationId: application.id,
       jobId: job.id,
       candidateId: candidate.id,
-      provider: hasOpenAI ? 'openai' : 'hiredesk_ai',
-      model: hasOpenAI ? 'gpt-4o-mini' : 'hiredesk-neural-v2',
+      provider: 'deterministic_baseline',
+      model: null,
       promptVersion: this.PROMPT_VERSION,
       evaluatedAt: now,
+      limitationNotice:
+        hasGemini
+          ? 'The configured Gemini provider was unavailable. Evaluated using deterministic skill/requirement overlap baseline.'
+          : 'No supported external AI provider configured. Evaluated using deterministic skill/requirement overlap baseline.',
       skillsMatch: {
         matchedSkills,
         missingSkills,
@@ -430,7 +410,7 @@ export class AiRecruiterService {
       gaps,
       interviewFocusAreas,
       decisionSupportDisclaimer:
-        'AI Recruiter decision support active. Recommendation for human recruiter review only.',
+        'This deterministic skill-overlap summary is decision support only. It does not automate any hiring or rejection decision; a human recruiter must review the candidate.',
     };
   }
 

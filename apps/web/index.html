@@ -7,7 +7,7 @@
     <title>HiredeskHR — Multi-Tenant Recruitment Agency ATS</title>
     <meta
       name="description"
-      content="HiredeskHR is a real, production-grade ATS built for recruitment agencies to manage clients, candidate pipelines, and automated application ingestion."
+      content="Manage agency vacancies, applications, candidate records, and client reviews in one recruitment workspace."
     />
     <meta name="theme-color" content="#0a0d14" id="theme-color-meta" />
 
@@ -16,7 +16,7 @@
     <meta property="og:title" content="HiredeskHR — Multi-Tenant Recruitment Agency ATS" />
     <meta
       property="og:description"
-      content="Production ATS designed for recruitment agencies to manage multi-tenant clients, automated Gmail ingestion, talent pools, and candidate pipelines."
+      content="Manage agency vacancies, applications, candidate records, and client reviews in one recruitment workspace."
     />
     <meta property="og:site_name" content="HiredeskHR" />
     <meta property="og:image" content="/og-preview.svg" />
@@ -26,25 +26,12 @@
     <meta name="twitter:title" content="HiredeskHR — Recruitment Agency ATS" />
     <meta
       name="twitter:description"
-      content="Applicant Tracking System with automated inbound ingestion, private resume storage, and dedicated client portals."
+      content="Manage agency vacancies, applications, candidate records, and client reviews in one recruitment workspace."
     />
     <meta name="twitter:image" content="/og-preview.svg" />
 
-    <!-- Instant Theme Initialization Script (Prevents Theme Flash) -->
-    <script>
-      (function() {
-        try {
-          var saved = localStorage.getItem('hiredesk-theme');
-          var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          var theme = saved || (systemDark ? 'dark' : 'light');
-          document.documentElement.setAttribute('data-theme', theme);
-          var meta = document.getElementById('theme-color-meta');
-          if (meta) {
-            meta.setAttribute('content', theme === 'light' ? '#f8fafc' : '#0a0d14');
-          }
-        } catch (e) {}
-      })();
-    </script>
+    <!-- Keep theme initialization external so the static site can use a strict script CSP. -->
+    <script src="/theme-init.js"></script>
 
     <!-- Google Fonts with Preconnect and Display Swap -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
