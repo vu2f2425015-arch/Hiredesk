@@ -20,7 +20,7 @@ export const CreateJobSchema = z
     description: z.string().min(20, { message: 'Description must be at least 20 characters' }),
     requirements: z.string().optional(),
     status: z.nativeEnum(JobStatus).default(JobStatus.DRAFT),
-    applicationFormConfig: z.record(z.unknown()).default({}).optional(),
+    applicationFormConfig: z.record(z.string(), z.unknown()).default({}).optional(),
   })
   .refine(
     (data) => {
@@ -54,7 +54,7 @@ export const UpdateJobSchema = z
     description: z.string().min(20).optional(),
     requirements: z.string().optional().nullable(),
     status: z.nativeEnum(JobStatus).optional(),
-    applicationFormConfig: z.record(z.unknown()).optional(),
+    applicationFormConfig: z.record(z.string(), z.unknown()).optional(),
   })
   .refine(
     (data) => {

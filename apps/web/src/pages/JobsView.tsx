@@ -15,6 +15,7 @@ import {
   X,
   Download,
   User,
+  Users,
   ExternalLink,
   Globe,
 } from 'lucide-react';
@@ -325,7 +326,7 @@ export function JobsView() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1.25rem' }}>
           {displayedJobs.map((job: ApiJob) => (
-            <div key={job.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div key={job.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.35rem 1.5rem' }}>
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -395,49 +396,82 @@ export function JobsView() {
                 )}
               </div>
 
-              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                  Applicants: <strong style={{ color: 'var(--text-main)' }}>{job.applicantCount}</strong>
-                </span>
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '0.85rem', marginTop: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Users size={14} style={{ color: 'var(--primary)' }} />
+                    Applicants: <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>{job.applicantCount}</strong>
+                  </span>
 
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: 'var(--primary)', borderColor: 'rgba(99, 102, 241, 0.4)' }}
-                    onClick={() => setPipelineJob(job)}
-                  >
-                    <Layers size={13} style={{ marginRight: '0.25rem' }} /> Pipeline
-                  </button>
                   {job.status === 'published' && (
                     <a
                       href={`/career/${orgSlug}/${job.jobCode}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-secondary"
-                      style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}
+                      style={{
+                        padding: '0.225rem 0.55rem',
+                        fontSize: '0.78rem',
+                        fontWeight: 600,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem',
+                        textDecoration: 'none',
+                        color: 'var(--primary)',
+                        background: 'var(--accent-subtle)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-sm)',
+                        transition: 'all 0.15s ease',
+                      }}
                       title="Open candidate application page in new tab"
                     >
-                      <ExternalLink size={13} /> Apply Page
+                      Apply Page <ExternalLink size={12} />
                     </a>
                   )}
-                  <button className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={() => setSelectedJob(job)}>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    className="btn btn-primary"
+                    style={{ flex: 1, minWidth: '95px', justifyContent: 'center', padding: '0.45rem 0.75rem', fontSize: '0.825rem', whiteSpace: 'nowrap' }}
+                    onClick={() => setPipelineJob(job)}
+                  >
+                    <Layers size={13} style={{ marginRight: '0.3rem' }} /> Pipeline
+                  </button>
+
+                  <button
+                    className="btn btn-secondary"
+                    style={{ minWidth: '70px', justifyContent: 'center', padding: '0.45rem 0.75rem', fontSize: '0.825rem', whiteSpace: 'nowrap' }}
+                    onClick={() => setSelectedJob(job)}
+                  >
                     Details
                   </button>
 
                   {canCreate && (
                     <>
                       {job.status === 'draft' && (
-                        <button className="btn btn-primary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }} onClick={() => handlePublish(job.id)}>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ minWidth: '65px', justifyContent: 'center', padding: '0.45rem 0.75rem', fontSize: '0.825rem', whiteSpace: 'nowrap', color: 'var(--primary)' }}
+                          onClick={() => handlePublish(job.id)}
+                        >
                           Publish
                         </button>
                       )}
                       {job.status === 'published' && (
-                        <button className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: 'var(--danger)' }} onClick={() => handleClose(job.id)}>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ minWidth: '65px', justifyContent: 'center', padding: '0.45rem 0.75rem', fontSize: '0.825rem', whiteSpace: 'nowrap', color: 'var(--danger)' }}
+                          onClick={() => handleClose(job.id)}
+                        >
                           Close
                         </button>
                       )}
                       {job.status === 'closed' && (
-                        <button className="btn btn-secondary" style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', color: 'var(--success)' }} onClick={() => handleReopen(job.id)}>
+                        <button
+                          className="btn btn-secondary"
+                          style={{ minWidth: '65px', justifyContent: 'center', padding: '0.45rem 0.75rem', fontSize: '0.825rem', whiteSpace: 'nowrap', color: 'var(--success)' }}
+                          onClick={() => handleReopen(job.id)}
+                        >
                           Reopen
                         </button>
                       )}

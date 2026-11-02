@@ -86,7 +86,7 @@ export const ClientPortalApplicationDtoSchema = z.object({
     location: z.string().nullable().optional(),
     skills: z.array(z.string()).default([]),
   }),
-  answers: z.record(z.unknown()).default({}),
+  answers: z.record(z.string(), z.unknown()).default({}),
   clientFeedback: z.string().nullable().optional(),
   resumes: z.array(
     z.object({

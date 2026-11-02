@@ -15,7 +15,7 @@ export const PublicApplySchema = z.object({
   name: z.string().min(2, { message: 'Name must be at least 2 characters' }),
   email: z.string().email({ message: 'Valid email is required' }),
   phone: z.string().min(3, { message: 'Contact phone is required' }).max(50).optional(),
-  answers: z.record(z.unknown()).default({}),
+  answers: z.record(z.string(), z.unknown()).default({}),
   honeypot: z.string().max(0).optional(),
 });
 
@@ -76,7 +76,7 @@ export const CandidateQuerySchema = z.object({
 
 export const StageTransitionSchema = z.object({
   stage: z.nativeEnum(ApplicationStage, {
-    errorMap: () => ({ message: 'Invalid application stage' }),
+    message: 'Invalid application stage',
   }),
   reason: z.string().max(500).optional(),
 });

@@ -16,7 +16,7 @@ export const CreateNotificationSchema = z.object({
   entityId: z.string().uuid().optional(),
   actionUrl: z.string().max(500).optional(),
   eventKey: z.string().max(255).optional(),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
 export type NotificationQueryInput = z.infer<typeof NotificationQuerySchema>;
