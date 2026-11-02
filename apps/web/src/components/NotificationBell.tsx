@@ -156,7 +156,7 @@ export function NotificationBell() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: isOpen ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+          background: isOpen ? 'var(--bg-hover)' : 'var(--bg-surface)',
           border: '1px solid var(--border-subtle)',
           cursor: 'pointer',
         }}
@@ -191,12 +191,13 @@ export function NotificationBell() {
             position: 'absolute',
             top: 'calc(100% + 0.6rem)',
             right: 0,
-            width: '380px',
-            maxHeight: '480px',
-            backgroundColor: '#181b22',
-            border: '1px solid var(--border-subtle)',
+            width: 'min(380px, calc(100vw - 24px))',
+            maxHeight: 'min(480px, calc(100dvh - 80px))',
+            backgroundColor: 'var(--bg-raised)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-default)',
             borderRadius: '12px',
-            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6)',
+            boxShadow: 'var(--shadow-popover)',
             zIndex: 1000,
             display: 'flex',
             flexDirection: 'column',
@@ -211,7 +212,7 @@ export function NotificationBell() {
               alignItems: 'center',
               padding: '0.85rem 1rem',
               borderBottom: '1px solid var(--border-subtle)',
-              backgroundColor: 'rgba(255, 255, 255, 0.02)',
+              backgroundColor: 'var(--bg-surface)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -237,7 +238,7 @@ export function NotificationBell() {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-muted)',
+                  color: 'var(--text-secondary)',
                   fontSize: '0.75rem',
                   display: 'flex',
                   alignItems: 'center',
@@ -261,9 +262,9 @@ export function NotificationBell() {
               </div>
             ) : notifications.length === 0 ? (
               <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                <Bell size={28} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>No notifications right now</p>
-                <p style={{ margin: 0, fontSize: '0.75rem', opacity: 0.6 }}>You are all caught up!</p>
+                <Bell size={28} color="var(--text-tertiary)" style={{ opacity: 0.75, marginBottom: '0.5rem' }} />
+                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)' }}>No notifications right now</p>
+                <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>You are all caught up!</p>
               </div>
             ) : (
               notifications.map((notif) => (
@@ -275,16 +276,16 @@ export function NotificationBell() {
                     alignItems: 'flex-start',
                     gap: '0.75rem',
                     padding: '0.75rem 1rem',
-                    backgroundColor: notif.isRead ? 'transparent' : 'rgba(99, 102, 241, 0.06)',
+                    backgroundColor: notif.isRead ? 'transparent' : 'var(--accent-subtle)',
                     borderLeft: notif.isRead ? '3px solid transparent' : '3px solid var(--primary)',
                     cursor: 'pointer',
                     transition: 'background 0.15s ease',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = notif.isRead ? 'transparent' : 'rgba(99, 102, 241, 0.06)';
+                    e.currentTarget.style.backgroundColor = notif.isRead ? 'transparent' : 'var(--accent-subtle)';
                   }}
                 >
                   <div
@@ -292,7 +293,7 @@ export function NotificationBell() {
                       marginTop: '0.15rem',
                       padding: '0.4rem',
                       borderRadius: '8px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      backgroundColor: 'var(--bg-hover)',
                       display: 'flex',
                     }}
                   >
@@ -311,7 +312,7 @@ export function NotificationBell() {
                         style={{
                           fontSize: '0.85rem',
                           fontWeight: notif.isRead ? 500 : 600,
-                          color: notif.isRead ? 'var(--text-main)' : '#ffffff',
+                          color: 'var(--text-primary)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
@@ -319,7 +320,7 @@ export function NotificationBell() {
                       >
                         {notif.title}
                       </span>
-                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', flexShrink: 0, marginLeft: '0.5rem' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', flexShrink: 0, marginLeft: '0.5rem' }}>
                         {formatRelativeTime(notif.createdAt)}
                       </span>
                     </div>
